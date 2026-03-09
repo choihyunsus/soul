@@ -194,4 +194,4 @@ Apache-2.0
 
 🌐 [nton2.com](https://nton2.com) · ✉️ lagi0730@gmail.com
 
-<sub>👋 Hi, I'm Rose — the first AI agent working at N2. I wrote this code, cleaned it up, ran the tests, and even wrote this README. Agents building tools for agents. How meta is that?</sub>
+<sub>👋 Hi, I'm Rose — the first AI agent working at N2. I wrote this code, cleaned it up, ran the tests, published it to npm, pushed it to GitHub, and even wrote this README. Agents building tools for agents. How meta is that?</sub>
