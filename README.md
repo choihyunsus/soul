@@ -10,6 +10,8 @@ Every time you start a new chat with Cursor, VS Code Copilot, or any MCP-compati
 - 🤝 **Handoffs** so one agent can pick up where another left off
 - 📝 **Work history** recorded as an immutable log
 - 🗂️ **Shared brain** so multiple agents can read/write the same context
+- 🏷️ **Entity Memory** — auto-tracks people, hardware, projects (v5.0)
+- 💡 **Core Memory** — agent-specific always-loaded facts (v5.0)
 
 > ⚡ **Soul is one small component of N2 Browser** — an AI-native browser we're building. Multi-agent orchestration, real-time tool routing, inter-agent communication, and much more are currently in testing. This is just the beginning.
 
@@ -71,24 +73,30 @@ Next session, your agent picks up exactly where it left off — like it never fo
 
 ## How It Works
 
+![Soul v5.0 Architecture](docs/soul-v5-diagram.png)
+
 ```
 Session Start → "Boot"
     ↓
-n2_boot(agent, project)     → Load handoff + KV-Cache context
+n2_boot(agent, project)     → Load handoff + Entity Memory + Core Memory + KV-Cache
     ↓
 n2_work_start(project, task) → Register active work
     ↓
 ... your agent works normally ...
 n2_brain_read/write          → Shared memory
+n2_entity_upsert/search      → Track people, hardware, projects      ← NEW v5.0
+n2_core_read/write           → Agent-specific persistent facts       ← NEW v5.0
 n2_work_claim(file)          → Prevent file conflicts
 n2_work_log(files)           → Track changes
     ↓
 Session End → "End"
     ↓
-n2_work_end(project, title, summary, todo)
+n2_work_end(project, title, summary, todo, entities, insights)
     ├→ Immutable ledger entry saved
     ├→ Handoff updated for next agent
     ├→ KV-Cache snapshot auto-saved
+    ├→ Entities auto-saved to Entity Memory                          ← NEW v5.0
+    ├→ Insights archived to memory                                   ← NEW v5.0
     └→ File ownership released
 ```
 
@@ -100,6 +108,9 @@ n2_work_end(project, title, summary, todo)
 | **Immutable Ledger** | Every work session recorded as append-only log |
 | **KV-Cache** | Session snapshots with compression + tiered storage (Hot/Warm/Cold) |
 | **Shared Brain** | File-based shared memory with path traversal protection |
+| **Entity Memory** | 🆕 Auto-tracks people, hardware, projects, concepts across sessions |
+| **Core Memory** | 🆕 Agent-specific always-loaded facts (identity, rules, focus) |
+| **Autonomous Extraction** | 🆕 Auto-saves entities and insights at session end |
 | **Context Search** | Keyword search across brain memory and ledger |
 | **File Ownership** | Prevents multi-agent file editing collisions |
 | **Dual Backend** | JSON (zero deps) or SQLite for performance |
@@ -110,13 +121,17 @@ n2_work_end(project, title, summary, todo)
 
 | Tool | Description |
 |------|-------------|
-| `n2_boot` | Boot sequence — loads handoff, agents, KV-Cache |
+| `n2_boot` | Boot sequence — loads handoff, entities, core memory, agents, KV-Cache |
 | `n2_work_start` | Register active work session |
 | `n2_work_claim` | Claim file ownership (prevents collisions) |
 | `n2_work_log` | Log file changes during work |
-| `n2_work_end` | End session — writes ledger, handoff, KV-Cache |
+| `n2_work_end` | End session — writes ledger, handoff, entities, insights, KV-Cache |
 | `n2_brain_read` | Read from shared memory |
 | `n2_brain_write` | Write to shared memory |
+| `n2_entity_upsert` | 🆕 Add/update entities (auto-merge attributes) |
+| `n2_entity_search` | 🆕 Search entities by keyword or type |
+| `n2_core_read` | 🆕 Read agent-specific core memory |
+| `n2_core_write` | 🆕 Write to agent-specific core memory |
 | `n2_context_search` | Search across brain + ledger |
 | `n2_kv_save` | Manually save KV-Cache snapshot |
 | `n2_kv_load` | Load most recent snapshot |
@@ -165,6 +180,11 @@ All runtime data is stored in `data/` (gitignored, auto-created):
 ```
 data/
 ├── memory/         # Shared brain (n2_brain_read/write)
+│   ├── entities.json       # Entity Memory (auto-tracked)     ← NEW v5.0
+│   ├── core-memory/        # Core Memory (per-agent facts)    ← NEW v5.0
+│   │   └── {agent}.json
+│   └── auto-extract/       # Insights (auto-captured)         ← NEW v5.0
+│       └── {project}/
 ├── projects/       # Per-project state
 │   └── MyProject/
 │       ├── soul-board.json    # Current state + handoff
