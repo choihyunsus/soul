@@ -343,6 +343,9 @@ Apache-2.0
 
 ## Contributing
 
+> **If you find Soul helpful, please consider giving us a star! ⭐**
+> It helps others discover this project and motivates us to keep building.
+
 Contributions are welcome! Here's how to get started:
 
 1. Fork the repo
