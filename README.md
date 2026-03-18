@@ -234,13 +234,13 @@ Soul includes an optional **Rust-based compiler** for `.n2` rule files — compi
 n2c validate soul-boot.n2
 
 # Output:
-# ── Step 1: 파싱 ✅
-# ── Step 2: 스키마 검증
-#   ✅ 검증 통과! 에러 0, 경고 0
-# ── Step 3: 계약 체크
+# ── Step 1: Parse ✅
+# ── Step 2: Schema Validation
+#   ✅ Passed! 0 errors, 0 warnings
+# ── Step 3: Contract Check
 #   📋 SessionLifecycle | states: 4 | transitions: 4
-#   ✅ 상태머신 무결성 검증 통과!
-# ✅ 검증 완료: 모든 체크 통과!
+#   ✅ State machine integrity verified!
+# ✅ All checks passed!
 ```
 
 What n2c catches at **compile time**:
