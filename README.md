@@ -19,8 +19,14 @@ Every time you start a new chat with Cursor, VS Code Copilot, or any MCP-compati
 
 ### 1. Install
 
+**Option A: npm (recommended)**
 ```bash
-git clone https://github.com/user/soul.git
+npm install n2-soul
+```
+
+**Option B: From source**
+```bash
+git clone https://github.com/choihyunsus/soul.git
 cd soul
 npm install
 ```
@@ -70,6 +76,20 @@ Next session, your agent picks up exactly where it left off — like it never fo
 | Agent A can't continue Agent B's work | Seamless handoff between agents |
 | Two agents edit the same file = conflict | File ownership prevents collisions |
 | Long conversations waste tokens on recap | Progressive loading uses only needed tokens |
+
+### Soul vs Others
+
+| | Soul | mem0 | Memorai | Zep |
+|---|:---:|:---:|:---:|:---:|
+| **Storage** | Deterministic (JSON/SQLite) | Embedding-based | Embedding-based | Embedding-based |
+| **Loading** | Mandatory (code-enforced at boot) | LLM-decided recall | LLM-decided recall | LLM-decided recall |
+| **Saving** | Mandatory (force-write at session end) | LLM-decided | LLM-decided | LLM-decided |
+| **Validation** | Rust compiler (n2c) | None | None | None |
+| **Multi-agent** | Built-in handoffs + file ownership | Not supported | Not supported | Limited |
+| **Token control** | Progressive L1/L2/L3 (~500 tokens min) | No control | No control | No control |
+| **Dependencies** | 3 packages | Heavy | Heavy | Heavy |
+
+> **Key difference**: Soul is *deterministic* — the code forces saves and loads. Other tools rely on the LLM to decide what to remember, which means it "forgets" whenever it wants to.
 
 ## Token Efficiency
 
@@ -163,6 +183,84 @@ KV-Cache automatically adjusts context detail based on token budget:
 | L1 | ~500 | Keywords + TODO only |
 | L2 | ~2000 | + Summary + Decisions |
 | L3 | No limit | + Files changed + Metadata |
+
+## Real-World Example
+
+Here's what happens across 3 real sessions:
+
+```
+── Session 1 (Rose, 2pm) ──────────────────────
+n2_boot("rose", "my-app")
+  → "No previous context found. Fresh start."
+
+... Rose builds the auth module ...
+
+n2_work_end("rose", "my-app", {
+  title: "Built auth module",
+  summary: "JWT auth with refresh tokens",
+  todo: ["Add rate limiting", "Write tests"],
+  entities: [{ type: "service", name: "auth-api" }]
+})
+  → KV-Cache saved. Ledger entry #001.
+
+── Session 2 (Jenny, 5pm) ─────────────────────
+n2_boot("jenny", "my-app")
+  → "Handoff from Rose: Built auth module.
+     TODO: Add rate limiting, Write tests.
+     Entity: auth-api (service)"
+
+... Jenny adds rate limiting, knows exactly where Rose left off ...
+
+n2_work_end("jenny", "my-app", {
+  title: "Added rate limiting",
+  todo: ["Write tests"]
+})
+
+── Session 3 (Rose, next day) ─────────────────
+n2_boot("rose", "my-app")
+  → "Handoff from Jenny: Rate limiting done.
+     TODO: Write tests.
+     2 sessions of history loaded (L1, ~500 tokens)"
+
+... Rose writes tests, with full context from both sessions ...
+```
+
+## Rust Compiler (n2c)
+
+Soul includes an optional **Rust-based compiler** for `.n2` rule files — compile-time validation instead of runtime hope.
+
+```bash
+# Validate rules before deployment
+n2c validate soul-boot.n2
+
+# Output:
+# ── Step 1: 파싱 ✅
+# ── Step 2: 스키마 검증
+#   ✅ 검증 통과! 에러 0, 경고 0
+# ── Step 3: 계약 체크
+#   📋 SessionLifecycle | states: 4 | transitions: 4
+#   ✅ 상태머신 무결성 검증 통과!
+# ✅ 검증 완료: 모든 체크 통과!
+```
+
+What n2c catches at **compile time**:
+- 🔒 **Unreachable states** — states no transition can reach
+- 💀 **Deadlocks** — states with no outgoing transitions
+- ❓ **Missing references** — `depends_on` pointing to nonexistent steps
+- 🚫 **Invalid sequences** — calling `n2_work_start` before `n2_boot`
+
+```n2
+@contract SessionLifecycle {
+  transitions {
+    IDLE -> BOOTING : on n2_boot
+    BOOTING -> READY : on boot_complete
+    READY -> WORKING : on n2_work_start
+    WORKING -> IDLE : on n2_work_end
+  }
+}
+```
+
+> The compiler is in `md_project/compiler/` — built with Rust + pest PEG parser. [Learn more](https://github.com/choihyunsus/soul/tree/main/docs)
 
 ## Configuration
 
