@@ -71,6 +71,19 @@ Next session, your agent picks up exactly where it left off — like it never fo
 | Two agents edit the same file = conflict | File ownership prevents collisions |
 | Long conversations waste tokens on recap | Progressive loading uses only needed tokens |
 
+## Token Efficiency
+
+Soul dramatically reduces token waste from context re-explanation:
+
+| Scenario | Tokens per session start |
+|----------|--------------------------|
+| **Without Soul** — manually re-explain context | 3,000 ~ 10,000+ |
+| **With Soul (L1)** — keywords + TODO only | ~500 |
+| **With Soul (L2)** — + summary + decisions | ~2,000 |
+| **With Soul (L3)** — full context restore | ~4,000 |
+
+Over 10 sessions, that's **30,000+ tokens saved** on context alone — and your agent starts with *better* context than a manual recap.
+
 ## How It Works
 
 ![Soul v5.0 Architecture](docs/soul-v5-diagram.png)
