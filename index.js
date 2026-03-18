@@ -1,4 +1,4 @@
-// Soul MCP v4.1 — Entry point. Multi-agent session orchestrator with KV-Cache.
+// Soul MCP v5.0 — Entry point. Multi-agent session orchestrator with KV-Cache.
 const { McpServer } = require('@modelcontextprotocol/sdk/server/mcp.js');
 const { StdioServerTransport } = require('@modelcontextprotocol/sdk/server/stdio.js');
 const { z } = require('zod');
@@ -15,7 +15,7 @@ const { registerKVCacheTools } = require('./tools/kv-cache');
 
 const server = new McpServer({
     name: 'n2-soul',
-    version: '4.1.0',
+    version: '5.0.1',
 });
 
 // Register all modules
