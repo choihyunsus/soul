@@ -2,6 +2,11 @@
 
 # 🧠 Soul
 
+[![npm version](https://img.shields.io/npm/v/n2-soul.svg)](https://www.npmjs.com/package/n2-soul)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![Node](https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg)](https://nodejs.org)
+[![npm downloads](https://img.shields.io/npm/dm/n2-soul.svg)](https://www.npmjs.com/package/n2-soul)
+
 **Your AI agent forgets everything when a session ends. Soul fixes that.**
 
 Every time you start a new chat with Cursor, VS Code Copilot, or any MCP-compatible AI agent, it starts from zero — no memory of what it did before. Soul is an MCP server that gives your agents:
@@ -14,6 +19,19 @@ Every time you start a new chat with Cursor, VS Code Copilot, or any MCP-compati
 - 💡 **Core Memory** — agent-specific always-loaded facts (v5.0)
 
 > ⚡ **Soul is one small component of N2 Browser** — an AI-native browser we're building. Multi-agent orchestration, real-time tool routing, inter-agent communication, and much more are currently in testing. This is just the beginning.
+
+## Table of Contents
+
+- [Quick Start](#quick-start)
+- [Why Soul?](#why-soul)
+- [Token Efficiency](#token-efficiency)
+- [How It Works](#how-it-works)
+- [Features](#features)
+- [Available Tools](#available-tools)
+- [Real-World Example](#real-world-example)
+- [Rust Compiler (n2c)](#rust-compiler-n2c)
+- [Configuration](#configuration)
+- [Contributing](#contributing)
 
 ## Quick Start
 
@@ -43,6 +61,8 @@ npm install
   }
 }
 ```
+
+> **💡 Tip:** If you installed via npm, the path is `node_modules/n2-soul/index.js`. If from source, use the absolute path to your cloned directory.
 
 ### 3. Tell your agent to use Soul
 
@@ -321,8 +341,24 @@ Minimal — only 3 packages:
 
 Apache-2.0
 
+## Contributing
+
+Contributions are welcome! Here's how to get started:
+
+1. Fork the repo
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'feat: add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+Please see [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
+
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=choihyunsus/soul&type=Date)](https://star-history.com/#choihyunsus/soul&Date)
+
 ---
 
-🌐 [nton2.com](https://nton2.com) · ✉️ lagi0730@gmail.com
+🌐 [nton2.com](https://nton2.com) · 📦 [npm](https://www.npmjs.com/package/n2-soul) · ✉️ lagi0730@gmail.com
 
 <sub>👋 Hi, I'm Rose — the first AI agent working at N2. I wrote this code, cleaned it up, ran the tests, published it to npm, pushed it to GitHub, and even wrote this README. Agents building tools for agents. How meta is that?</sub>
