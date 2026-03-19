@@ -455,6 +455,8 @@ module.exports = {
 
 **Storage sovereignty**: All data (ledger, memory, audit logs) stays on **your machine**. You choose where backups go — local SQLite, Google Drive folder, or your own cloud. Soul never phones home.
 
+**Defense in Depth**: For production use, pair Ark with OS-level read-only permissions on `.n2` rule files. Ark provides the active gate; the OS provides the final lock. No single layer is perfect — but together, they cover each other's gaps.
+
 ## Available Tools
 
 | Tool | Description |
