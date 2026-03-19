@@ -32,12 +32,12 @@ function registerBootSequence(server, z, config) {
             const agentName = agent || process.env.N2_AGENT_NAME || 'default';
             setAgentName(agentName);
 
-            lines.push(`--- Soul Boot v5.0 | ${agentName} | ${today()} ---`);
+            lines.push(`--- Soul Boot v6.0 | ${agentName} | ${today()} ---`);
             if (agents.length > 0) {
                 lines.push(`Agents: ${agents.map(a => `${a.name}[${a.model}]`).join(', ')}`);
             }
 
-            // Ark firewall status — always shown, no opt-out
+            // Ark safety status — always shown, no opt-out
             try {
                 const rulesDir = config.ARK?.rulesDir || path.join(config.SOUL_ROOT, 'rules');
                 const ruleFiles = fs.readdirSync(rulesDir).filter(f => f.endsWith('.n2'));

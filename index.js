@@ -1,4 +1,4 @@
-// Soul MCP v5.0 — Entry point. Multi-agent session orchestrator with KV-Cache + Ark Firewall.
+// Soul MCP v6.0 — Entry point. Multi-agent session orchestrator with KV-Cache + Ark.
 const path = require('path');
 const { McpServer } = require('@modelcontextprotocol/sdk/server/mcp.js');
 const { StdioServerTransport } = require('@modelcontextprotocol/sdk/server/stdio.js');
