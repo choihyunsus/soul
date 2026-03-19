@@ -17,7 +17,7 @@ const { registerKVCacheTools } = require('./tools/kv-cache');
 
 const server = new McpServer({
     name: 'n2-soul',
-    version: '6.0.2',
+    version: '6.0.3',
 });
 
 // ═══════════════════════════════════════════════════════

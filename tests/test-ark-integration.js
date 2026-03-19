@@ -1,10 +1,10 @@
 // n2-ark + n2-soul integration test — pure last shield
 const path = require('path');
-const { createArk } = require('./lib/ark');
+const { createArk } = require('../lib/ark');
 
 const ark = createArk({
-    rulesDir: path.join(__dirname, 'rules'),
-    auditDir: path.join(__dirname, 'data', 'ark-audit'),
+    rulesDir: path.join(__dirname, '..', 'rules'),
+    auditDir: path.join(__dirname, '..', 'data', 'ark-audit'),
 });
 
 let passed = 0;

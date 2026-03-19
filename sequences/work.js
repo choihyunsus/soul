@@ -7,6 +7,19 @@ const { SoulEngine } = require('../lib/soul-engine');
 // In-memory work session state per project
 const activeSessions = {};
 
+// TTL: auto-expire stale sessions (24 hours, checked every hour)
+const SESSION_TTL_MS = 24 * 60 * 60 * 1000;
+const _sessionGcTimer = setInterval(() => {
+    const now = Date.now();
+    for (const [project, session] of Object.entries(activeSessions)) {
+        if (session._createdMs && (now - session._createdMs) > SESSION_TTL_MS) {
+            delete activeSessions[project];
+            logError('work:ttl', `Expired stale session: ${project} (agent: ${session.agent})`);
+        }
+    }
+}, 60 * 60 * 1000);
+_sessionGcTimer.unref(); // Don't prevent Node.js from exiting
+
 // ── Helper: recursively walk files in a directory ──
 function walkFiles(dir, callback, maxDepth, depth = 0) {
     if (depth > maxDepth) return;
@@ -45,6 +58,7 @@ function registerWorkSequence(server, z, config) {
                 agent,
                 task,
                 startedAt: nowISO(),
+                _createdMs: Date.now(),
                 filesCreated: [],
                 filesModified: [],
                 filesDeleted: [],
