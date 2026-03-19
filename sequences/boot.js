@@ -1,4 +1,4 @@
-// Soul MCP v5.0 — Boot sequence. Handoff + Entity/Core Memory injection + KV-Cache restore.
+// Soul MCP v6.0 — Boot sequence. Handoff + Entity/Core Memory injection + KV-Cache restore.
 const path = require('path');
 const fs = require('fs');
 const { readJson, today, nowISO, logError } = require('../lib/utils');
@@ -46,10 +46,19 @@ function registerBootSequence(server, z, config) {
                 lines.push(`Ark: LOAD FAILED — ${e.message}`);
             }
 
-            // -- Soul Board: handoff + TODO --
-            if (project) {
-                const board = engine.readBoard(project);
-                lines.push(`\n--- ${project} | v${board.state.version || '?'} | ${board.state.health || '?'} ---`);
+            // -- Soul Board: handoff + TODO (auto-detect latest project) --
+            let targetProject = project;
+            if (!targetProject) {
+                const allProjects = engine.listAllProjects();
+                if (allProjects.length > 0) {
+                    targetProject = allProjects[0].name;
+                    lines.push(`\n📍 Auto-detected latest project: ${targetProject}`);
+                }
+            }
+
+            if (targetProject) {
+                const board = engine.readBoard(targetProject);
+                lines.push(`\n--- ${targetProject} | v${board.state.version || '?'} | ${board.state.health || '?'} ---`);
 
                 if (board.handoff && board.handoff.summary) {
                     lines.push(`Handoff(${board.handoff.from}): ${board.handoff.summary}`);
@@ -70,13 +79,13 @@ function registerBootSequence(server, z, config) {
             }
 
             // -- KV-Cache auto-load --
-            if (project && config.KV_CACHE?.enabled && config.KV_CACHE?.autoLoadOnBoot) {
+            if (targetProject && config.KV_CACHE?.enabled && config.KV_CACHE?.autoLoadOnBoot) {
                 try {
                     const { SoulKVCache } = require('../lib/kv-cache');
                     const kvCache = new SoulKVCache(config.DATA_DIR, config.KV_CACHE);
-                    const snap = kvCache.load(project);
+                    const snap = kvCache.load(targetProject);
                     if (snap) {
-                        setKvChainParent(project, snap.id);
+                        setKvChainParent(targetProject, snap.id);
                         const level = snap._level || 'auto';
                         const tokens = snap._promptTokens || '?';
                         lines.push(`\nKV-Cache: ${level} | ~${tokens}t | ${snap.id.slice(0, 8)}`);
@@ -105,7 +114,7 @@ function registerBootSequence(server, z, config) {
                 lines.push(`⚠️ Core Memory: ${e.message}`);
             }
 
-            lines.push(`\n--- Soul Boot v5.0 complete ---`);
+            lines.push(`\n--- Soul Boot v6.0 complete ---`);
             return { content: [{ type: 'text', text: lines.join('\n') }] };
         }
     );

@@ -6,21 +6,20 @@
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg)](https://nodejs.org)
 [![npm downloads](https://img.shields.io/npm/dm/n2-soul.svg)](https://www.npmjs.com/package/n2-soul)
-[![NEW](https://img.shields.io/badge/v6.0-Ark:%20The%20Last%20Shield-ff4444?style=for-the-badge)](https://github.com/choihyunsus/soul#ark-firewall)
+[![NEW](https://img.shields.io/badge/v6.1-Cloud%20Storage-4488ff?style=for-the-badge)](https://github.com/choihyunsus/soul#️-cloud-storage--store-your-ai-memory-anywhere)
 
 **Your AI agent forgets everything when a session ends. Soul fixes that.**
 **Your AI agent might do something dangerous. Ark stops that.**
 
-> ### 🚀 What's New in v6.0 — Ark: The Last Shield
+> ### 🚀 What's New in v6.1 — Cloud Storage
 >
-> Soul v6.0 introduces **Ark**, a built-in AI safety system that intercepts every tool call and blocks dangerous actions **before they execute**. No LLM calls, no token cost, no latency — pure regex matching at the MCP server level.
+> Store your AI memory **anywhere** — Google Drive, OneDrive, NAS, company server, USB. Just one line:
+> ```js
+> DATA_DIR: 'G:/My Drive/n2-soul'
+> ```
+> **$0/month. Zero API keys. Zero new dependencies.** While others charge $99~$599/month, Soul uses your existing file sync. [Learn more →](#️-cloud-storage--store-your-ai-memory-anywhere)
 >
-> - Every tool call passes through `ark.check()` — **unconditionally**
-> - There is no `enabled: false` — Ark is always on by design
-> - Ships with 12 blacklist rules, 125 patterns, and 7 industry templates
-> - Self-protection: 4 layers prevent a rogue AI from disabling the firewall
->
-> This is why v6.0 is a **major version**: every tool call now has a guardian. [Learn more →](#ark-firewall)
+> Also includes **Ark** (v6.0) — built-in AI safety that blocks dangerous actions at zero token cost. [Learn more →](#ark--the-last-shield)
 
 Every time you start a new chat with Cursor, VS Code Copilot, or any MCP-compatible AI agent, it starts from zero — no memory of what it did before. Soul is an MCP server that gives your agents:
 
@@ -41,6 +40,7 @@ Every time you start a new chat with Cursor, VS Code Copilot, or any MCP-compati
 - [Token Efficiency](#token-efficiency)
 - [How It Works](#how-it-works)
 - [Features](#features)
+- [Cloud Storage](#️-cloud-storage--store-your-ai-memory-anywhere)
 - [Available Tools](#available-tools)
 - [Real-World Example](#real-world-example)
 - [Rust Compiler (n2c)](#rust-compiler-n2c)
@@ -185,6 +185,70 @@ n2_work_end(project, title, summary, todo, entities, insights)
 | **Semantic Search** | Optional Ollama embedding (nomic-embed-text) |
 | **Backup/Restore** | Incremental backups with configurable retention |
 | **Ark** | 🆕 Built-in AI safety — blocks dangerous actions at zero token cost |
+| **Cloud Storage** | 🆕 Store memory anywhere — Google Drive, NAS, network server, any path (v6.1) |
+
+## ☁️ Cloud Storage — Store Your AI Memory Anywhere
+
+![Cloud Storage](docs/cloud-storage.png)
+
+> **One line of config. Zero API keys. Zero monthly fees.**
+
+Other AI memory services charge **$99~$599/month** for cloud storage. Soul takes a radically different approach:
+
+```js
+// config.local.js — This is ALL you need
+module.exports = {
+    DATA_DIR: 'G:/My Drive/n2-soul',  // Google Drive
+};
+```
+
+**That's it.** Your AI memory is now in the cloud. Every session, every handoff, every ledger entry — automatically synced by Google Drive. No OAuth, no API keys, no SDK.
+
+### How It Works
+
+Soul stores everything as **plain JSON files**. Any folder that your OS can read = Soul's cloud. The cloud provider handles sync — Soul doesn't even know it's "in the cloud."
+
+### Supported Storage
+
+| Storage | Example `DATA_DIR` | Cost |
+|---------|-------------------|:----:|
+| 📁 **Local** (default) | `./data` | Free |
+| ☁️ **Google Drive** | `G:/My Drive/n2-soul` | Free (15GB) |
+| ☁️ **OneDrive** | `C:/Users/you/OneDrive/n2-soul` | Free (5GB) |
+| ☁️ **Dropbox** | `C:/Users/you/Dropbox/n2-soul` | Free (2GB) |
+| 🖥️ **NAS** | `Z:/n2-soul` | Your hardware |
+| 🏢 **Company Server** | `\\\\server\\shared\\n2-soul` | Your infra |
+| 🔌 **USB Drive** | `E:/n2-soul` | $10 |
+| 🐧 **Linux (rclone)** | `~/gdrive/n2-soul` | Free |
+
+### vs. Other AI Memory Services
+
+| | Soul | mem0 | Zep AI |
+|---|:---:|:---:|:---:|
+| **Cloud storage** | One line of config | API integration | API integration |
+| **Monthly cost** | **$0** | $99/mo | $599/mo |
+| **Setup time** | 10 seconds | Hours | Hours |
+| **Vendor lock-in** | None — it's your files | API dependent | API dependent |
+| **Data ownership** | 100% yours | Their servers | Their servers |
+| **Works offline** | Yes | No | No |
+| **Self-hosted option** | Any path = cloud | Enterprise only | Enterprise only |
+
+### Team Sharing
+
+Point multiple agents to the **same network path** = instant shared memory:
+
+```js
+// Team member A                         // Team member B
+DATA_DIR: '\\\\server\\team\\n2-soul'    DATA_DIR: '\\\\server\\team\\n2-soul'
+// Same project data, shared handoffs, shared brain!
+```
+
+### Why This Works
+
+> *"The best cloud integration is no integration at all."*
+
+Soul's data is **100% plain JSON files** — `soul-board.json`, ledger entries, brain memory. Any sync service that mirrors folders (Google Drive, OneDrive, Dropbox, Syncthing, rsync) works perfectly because there's nothing to integrate. No database migrations, no API versions, no SDK updates. Just files.
+
 
 ## Ark — The Last Shield
 
