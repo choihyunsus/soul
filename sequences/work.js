@@ -1,4 +1,4 @@
-// Soul MCP v4.1 — Work sequence. Real-time change tracking, file ownership, context search.
+// Soul MCP v6.0 — Work sequence. Real-time change tracking, file ownership, context search.
 const fs = require('fs');
 const path = require('path');
 const { nowISO, readJson, readFile, validateFirstLineComment, logError } = require('../lib/utils');

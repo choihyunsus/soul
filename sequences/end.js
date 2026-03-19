@@ -1,4 +1,4 @@
-// Soul MCP v5.0 — End sequence. Ledger + board handoff + KV-Cache + entities/insights auto-save.
+// Soul MCP v6.0 — End sequence. Ledger + board handoff + KV-Cache + entities/insights auto-save.
 const path = require('path');
 const fs = require('fs');
 const { nowISO, logError } = require('../lib/utils');

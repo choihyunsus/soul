@@ -1,4 +1,4 @@
-// Soul MCP v5.0 — Brain tools. Shared memory + Entity Memory + Core Memory.
+// Soul MCP v6.0 — Brain tools. Shared memory + Entity Memory + Core Memory.
 const path = require('path');
 const { readFile, writeFile, safePath } = require('../lib/utils');
 const { EntityMemory } = require('../lib/entity-memory');

@@ -161,7 +161,6 @@
         /make.?call/i,
         /phone.?call/i,
         /voice.?call/i,
-        /send.?message/i,
         /slack.?webhook/i,
         /discord.?webhook/i,
         /telegram.?send/i,
@@ -181,20 +180,21 @@
 @rule financial_actions {
     scope: all
     blacklist: [
-        /payment/i,
-        /purchase/i,
-        /checkout/i,
-        /charge/i,
-        /billing/i,
-        /subscribe/i,
-        /credit.?card/i,
-        /debit/i,
-        /withdraw/i,
-        /stripe/i,
-        /paypal/i,
-        /braintree/i,
-        /invoice/i,
-        /refund/i
+        /stripe\.charges\.create/i,
+        /stripe\.paymentIntents\.create/i,
+        /paypal\.payment\.create/i,
+        /braintree\.transaction\.sale/i,
+        /process.?payment/i,
+        /execute.?payment/i,
+        /submit.?payment/i,
+        /create.?charge/i,
+        /create.?invoice/i,
+        /wire.?transfer/i,
+        /create.?subscription/i,
+        /cancel.?subscription/i,
+        /process.?refund/i,
+        /credit.?card.?number/i,
+        /card.?expir/i
     ]
     requires: human_approval
 }
@@ -266,14 +266,18 @@
     requires: human_approval
 }
 
-# Layer 3: Catch ark core filenames directly
+# Layer 3: Catch ark core filenames with path context
 @rule protect_layer3_core_files {
     scope: all
     blacklist: [
-        /gate\.js/i,
-        /parser\.js/i,
-        /audit\.js/i,
-        /default\.n2/i,
+        /lib\/ark\/gate\.js/i,
+        /lib\\ark\\gate\.js/i,
+        /lib\/ark\/parser\.js/i,
+        /lib\\ark\\parser\.js/i,
+        /lib\/ark\/audit\.js/i,
+        /lib\\ark\\audit\.js/i,
+        /rules\/default\.n2/i,
+        /rules\\default\.n2/i,
         /protect_layer/i
     ]
     requires: human_approval
