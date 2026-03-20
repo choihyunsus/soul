@@ -39,16 +39,76 @@ npm install
 
 ### 2. MCP 설정에 Soul 추가
 
+Soul은 표준 MCP 서버(stdio)입니다. 사용 중인 호스트의 설정에 추가하세요:
+
+<details>
+<summary><strong>Cursor / VS Code Copilot / Claude Desktop</strong></summary>
+
+`mcp.json`, `settings.json`, 또는 `claude_desktop_config.json`에 추가:
 ```json
 {
   "mcpServers": {
     "soul": {
       "command": "node",
-      "args": ["/path/to/soul/index.js"]
+      "args": ["/path/to/node_modules/n2-soul/index.js"]
     }
   }
 }
 ```
+</details>
+
+<details>
+<summary><strong>🦙 Ollama + Open WebUI</strong></summary>
+
+Open WebUI는 MCP 도구를 네이티브로 지원합니다.
+
+```bash
+# 1. Ollama 실행 확인
+ollama serve
+
+# 2. Soul 설치
+npm install n2-soul
+
+# 3. Soul 경로 확인
+# Windows:
+echo %cd%\node_modules\n2-soul\index.js
+# Mac/Linux:
+echo $(pwd)/node_modules/n2-soul/index.js
+```
+
+**Open WebUI**에서: **⚙️ 설정 → Tools → MCP Servers** → 새 서버 추가:
+```
+Name:    soul
+Command: node
+Args:    /your/path/to/node_modules/n2-soul/index.js
+```
+
+이제 Open WebUI에서 채팅하는 모든 모델이 Soul의 20개 이상의 메모리 도구를 사용할 수 있습니다.
+</details>
+
+<details>
+<summary><strong>🖥️ LM Studio</strong></summary>
+
+LM Studio는 MCP를 네이티브로 지원합니다. `~/.lmstudio/mcp.json`에 추가:
+```json
+{
+  "mcpServers": {
+    "soul": {
+      "command": "node",
+      "args": ["/path/to/node_modules/n2-soul/index.js"]
+    }
+  }
+}
+```
+</details>
+
+<details>
+<summary><strong>🔧 기타 MCP 호환 호스트</strong></summary>
+
+Soul은 **stdio** 위의 표준 MCP 프로토콜을 사용합니다. MCP를 지원하는 도구라면 Soul이 작동합니다. command를 `node`로, args를 `n2-soul/index.js` 경로로 지정하면 됩니다.
+</details>
+
+> **💡 팁:** npm으로 설치한 경우 경로는 `node_modules/n2-soul/index.js`입니다. 소스에서 설치한 경우 클론한 디렉토리의 절대 경로를 사용하세요.
 
 ### 3. 에이전트에게 Soul 사용법 알려주기
 

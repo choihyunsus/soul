@@ -66,16 +66,74 @@ npm install
 
 ### 2. Add Soul to your MCP config
 
+Soul is a standard MCP server (stdio). Add it to your host's config:
+
+<details>
+<summary><strong>Cursor / VS Code Copilot / Claude Desktop</strong></summary>
+
+Add to `mcp.json`, `settings.json`, or `claude_desktop_config.json`:
 ```json
 {
   "mcpServers": {
     "soul": {
       "command": "node",
-      "args": ["/path/to/soul/index.js"]
+      "args": ["/path/to/node_modules/n2-soul/index.js"]
     }
   }
 }
 ```
+</details>
+
+<details>
+<summary><strong>🦙 Ollama + Open WebUI</strong></summary>
+
+Open WebUI supports MCP tools natively.
+
+```bash
+# 1. Make sure Ollama is running
+ollama serve
+
+# 2. Install Soul
+npm install n2-soul
+
+# 3. Find your Soul path
+# Windows:
+echo %cd%\node_modules\n2-soul\index.js
+# Mac/Linux:
+echo $(pwd)/node_modules/n2-soul/index.js
+```
+
+In **Open WebUI**: Go to **⚙️ Settings → Tools → MCP Servers** → Add new server:
+```
+Name:    soul
+Command: node
+Args:    /your/path/to/node_modules/n2-soul/index.js
+```
+
+Now any model you chat with in Open WebUI can use Soul's 20+ memory tools.
+</details>
+
+<details>
+<summary><strong>🖥️ LM Studio</strong></summary>
+
+LM Studio supports MCP natively. Add to `~/.lmstudio/mcp.json`:
+```json
+{
+  "mcpServers": {
+    "soul": {
+      "command": "node",
+      "args": ["/path/to/node_modules/n2-soul/index.js"]
+    }
+  }
+}
+```
+</details>
+
+<details>
+<summary><strong>🔧 Any other MCP-compatible host</strong></summary>
+
+Soul speaks standard MCP protocol over **stdio**. If your tool supports MCP, Soul works. Just point the command to `node` and the args to `n2-soul/index.js`.
+</details>
 
 > **💡 Tip:** If you installed via npm, the path is `node_modules/n2-soul/index.js`. If from source, use the absolute path to your cloned directory.
 
