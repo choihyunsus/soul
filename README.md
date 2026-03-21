@@ -6,18 +6,19 @@
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg)](https://nodejs.org)
 [![npm downloads](https://img.shields.io/npm/dm/n2-soul.svg)](https://www.npmjs.com/package/n2-soul)
-[![NEW](https://img.shields.io/badge/v6.1-Cloud%20Storage-4488ff?style=for-the-badge)](https://github.com/choihyunsus/soul#️-cloud-storage--store-your-ai-memory-anywhere)
+[![NEW](https://img.shields.io/badge/v7.0-Arachne-9944ff?style=for-the-badge)](https://github.com/choihyunsus/soul#arachne--the-greatest-weaver)
 
 **Your AI agent forgets everything when a session ends. Soul fixes that.**
 **Your AI agent might do something dangerous. Ark stops that.**
+**Your AI agent wastes tokens reading irrelevant code. Arachne fixes that.**
 
-> ### 🚀 What's New in v6.1 — Cloud Storage
+> ### 🚀 What's New in v7.0 — Arachne
 >
-> Store your AI memory **anywhere** — Google Drive, OneDrive, NAS, company server, USB. Just one line:
-> ```js
-> DATA_DIR: 'G:/My Drive/n2-soul'
+> **Arachne** — Code Context Assembly Engine. Indexes your entire codebase and picks **exactly** what your AI needs.
 > ```
-> **$0/month. Zero API keys. Zero new dependencies.** Soul uses your existing file sync. [Learn more →](#️-cloud-storage--store-your-ai-memory-anywhere)
+> 50,000 file project → 30 most relevant chunks → 30K tokens (instead of 500K+)
+> ```
+> BM25 search + dependency tracking + smart assembly. Optional semantic search via Ollama. [Learn more →](#arachne--the-greatest-weaver)
 >
 > Also includes **Ark** (v6.0) — built-in AI safety that blocks dangerous actions at zero token cost. [Learn more →](#ark--the-last-shield)
 
@@ -30,6 +31,7 @@ Every time you start a new chat with Cursor, VS Code Copilot, or any MCP-compati
 - 🏷️ **Entity Memory** — auto-tracks people, hardware, projects (v5.0)
 - 💡 **Core Memory** — agent-specific always-loaded facts (v5.0)
 - 🛡️ **Ark** — built-in AI safety that blocks dangerous actions at zero token cost (v6.0)
+- 🕸️ **Arachne** — code context assembly engine that picks exactly what AI needs (v7.0)
 
 > ⚡ **Soul is one small component of N2 Browser** — an AI-native browser we're building. Multi-agent orchestration, real-time tool routing, inter-agent communication, and much more are currently in testing. This is just the beginning.
 
@@ -47,6 +49,7 @@ Every time you start a new chat with Cursor, VS Code Copilot, or any MCP-compati
 - [Configuration](#configuration)
 - [Contributing](#contributing)
 - [Ark — The Last Shield](#ark--the-last-shield)
+- [Arachne — The Greatest Weaver](#arachne--the-greatest-weaver)
 
 ## Quick Start
 
@@ -243,6 +246,7 @@ n2_work_end(project, title, summary, todo, entities, insights)
 | **Semantic Search** | Optional Ollama embedding (nomic-embed-text) |
 | **Backup/Restore** | Incremental backups with configurable retention |
 | **Ark** | 🆕 Built-in AI safety — blocks dangerous actions at zero token cost |
+| **Arachne** | 🆕 Code context assembly — indexes codebase, picks exactly what AI needs (v7.0) |
 | **Cloud Storage** | 🆕 Store memory anywhere — Google Drive, NAS, network server, any path (v6.1) |
 
 ## ☁️ Cloud Storage — Store Your AI Memory Anywhere
@@ -536,6 +540,92 @@ module.exports = {
 - **Wildcard destruction** — blocks `rm *`, `find -delete`, `xargs rm` (self-protection bypass)
 - **Command execution gate** — `@gate` on `execute_command`, `run_shell`, etc. (whitelist approach)
 
+## Arachne — The Greatest Weaver
+
+> *In Greek mythology, Arachne was a mortal weaver whose tapestries rivaled the gods. She wove exactly the right threads in exactly the right places.*
+
+**Arachne** is Soul's code context assembly engine. It indexes your entire codebase and picks **exactly** the chunks your AI agent needs — no more, no less.
+
+### The Problem
+
+AI agents waste massive tokens reading irrelevant code:
+
+| Approach | Tokens used | Relevance |
+|----------|:----------:|:---------:|
+| **Paste entire file** | 10,000+ | ~20% relevant |
+| **Dump whole project** | 500,000+ | ~5% relevant |
+| **Arachne** | ~30,000 | **~90% relevant** |
+
+### How Arachne Works
+
+```
+Your 50,000-file project
+         │
+    ┌────┴────┐
+    │  Index   │ ← Scans all files, chunks by function/class
+    │  (boot)  │   Incremental: only re-indexes changed files
+    └────┬────┘
+         │
+    ┌────┴────┐
+    │  Search  │ ← BM25 keyword search (+ optional semantic via Ollama)
+    │  (query) │   Finds the most relevant chunks across all files
+    └────┬────┘
+         │
+    ┌────┴────┐
+    │ Assemble │ ← Picks top chunks within your token budget
+    │ (budget) │   4 layers: fixed + short-term + associative + spare
+    └────┬────┘
+         │
+   30 most relevant
+   code chunks → AI
+```
+
+### Key Features
+
+| Feature | Description |
+|---------|------------|
+| **Incremental Indexing** | Only re-indexes changed files (hash-based detection) |
+| **Language-Aware Chunking** | Splits code by function/class boundaries, not arbitrary lines |
+| **BM25 Search** | Fast keyword search with TF-IDF ranking |
+| **Semantic Search** | Optional Ollama embeddings (nomic-embed-text) |
+| **Token Budget Assembly** | Smart context assembly within configurable token limits |
+| **4-Layer Assembly** | Fixed (10%) + Short-term (30%) + Associative (40%) + Spare (20%) |
+| **17 Languages** | JS, TS, Python, Rust, Go, Java, C/C++, C#, Ruby, PHP, Swift, Kotlin |
+| **12 Text Formats** | MD, JSON, YAML, XML, HTML, CSS, SQL, Shell scripts |
+| **Backup/Restore** | Incremental backups with configurable retention |
+
+### Configuration
+
+Arachne settings in `lib/config.default.js`:
+
+```js
+ARACHNE: {
+    projectDir: null,         // Set to your project root to enable
+    indexing: {
+        autoIndex: true,      // Auto-index on boot
+        maxFileSize: 512 * 1024,
+    },
+    assembly: {
+        defaultBudget: 30000, // Token budget for context
+    },
+    embedding: {
+        enabled: false,       // true = requires: ollama pull nomic-embed-text
+    },
+}
+```
+
+### Usage
+
+```
+n2_arachne(action: "index")     → Index your project files
+n2_arachne(action: "search", query: "authentication JWT")  → Search code
+n2_arachne(action: "assemble", query: "how does auth work?", budget: 30000)  → Full context assembly
+n2_arachne(action: "status")    → Check index status
+n2_arachne(action: "backup")    → Backup index DB
+```
+
+> **Also available as standalone package:** [`n2-arachne`](https://www.npmjs.com/package/n2-arachne) — use Arachne without Soul.
+
 ## Available Tools
 
 | Tool | Description |
@@ -559,6 +649,7 @@ module.exports = {
 | `n2_kv_backup` | Backup to portable SQLite DB |
 | `n2_kv_restore` | Restore from backup |
 | `n2_kv_backup_list` | List backup history |
+| `n2_arachne` | 🆕 Code context: index, search, assemble, backup, status (v7.0) |
 
 ## KV-Cache Progressive Loading
 
@@ -676,22 +767,23 @@ All runtime data is stored in `data/` (gitignored, auto-created):
 
 ```
 soul/
-├── rules/              # Ark safety rules (active)              ← NEW v6.0
+├── rules/              # Ark safety rules (active)              ← v6.0
 │   └── default.n2          # Default ruleset (125 patterns)
 ├── lib/
-│   └── ark/            # Ark core engine                        ← NEW v6.0
-│       ├── index.js        # createArk() factory
-│       ├── gate.js         # SafetyGate engine
-│       ├── parser.js       # .n2 rule parser
-│       ├── audit.js        # Audit logger
-│       └── examples/       # Industry rule templates
-│           ├── medical.n2       # Healthcare (HIPAA, prescriptions)
-│           ├── military.n2      # Defense (engagement, nuclear)
-│           ├── financial.n2     # Finance (payments, transactions)
-│           ├── legal.n2         # Legal (contracts, litigation)
-│           ├── privacy.n2       # Privacy (GDPR, CCPA, PII)
-│           ├── autonomous.n2    # Autonomous (drones, vehicles)
-│           └── system.n2        # DevOps (deployment, infra)
+│   ├── ark/            # Ark core engine                        ← v6.0
+│   │   ├── index.js        # createArk() factory
+│   │   ├── gate.js         # SafetyGate engine
+│   │   ├── parser.js       # .n2 rule parser
+│   │   ├── audit.js        # Audit logger
+│   │   └── examples/       # Industry rule templates
+│   └── arachne/        # Arachne code context engine             ← NEW v7.0
+│       ├── index.js        # createArachne() factory
+│       ├── indexer.js      # File scanner + incremental indexing
+│       ├── chunker.js      # Language-aware code chunking
+│       ├── search.js       # BM25 search engine
+│       ├── assembler.js    # Context assembly with token budget
+│       ├── store.js        # SQLite storage (sql.js)
+│       └── ignore.js       # .gitignore + .contextignore support
 ├── data/
 │   ├── memory/         # Shared brain (n2_brain_read/write)
 │   │   ├── entities.json       # Entity Memory (auto-tracked)
@@ -706,7 +798,8 @@ soul/
 │   │       └── ledger/            # Immutable work logs
 │   │           └── 2026/03/09/
 │   │               └── 001-agent.json
-│   ├── ark-audit/      # Ark block/pass logs                   ← NEW v6.0
+│   ├── ark-audit/      # Ark block/pass logs                   ← v6.0
+│   ├── arachne/        # Arachne index DB + embeddings          ← NEW v7.0
 │   └── kv-cache/       # Session snapshots
 │       ├── snapshots/  # JSON backend
 │       ├── sqlite/     # SQLite backend
