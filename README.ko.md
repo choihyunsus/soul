@@ -458,6 +458,24 @@ soul/
 
 Apache-2.0
 
+## 💖 스폰서
+
+Soul은 무료 오픈소스입니다. 이 멋진 분들이 Soul을 살아있게 해줍니다:
+
+<table>
+  <tr>
+    <td align="center">
+      <a href="https://github.com/sunir">
+        <img src="https://github.com/sunir.png" width="80" height="80" style="border-radius:50%;" alt="Sunir Shah" /><br />
+        <sub><b>Sunir Shah</b></sub>
+      </a><br />
+      <sub>🥇 첫 번째 스폰서</sub>
+    </td>
+  </tr>
+</table>
+
+> 스폰서가 되어주세요 → [GitHub Sponsors](https://github.com/sponsors/choihyunsus)
+
 ---
 
 🌐 [nton2.com](https://nton2.com) · ✉️ lagi0730@gmail.com

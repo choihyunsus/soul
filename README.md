@@ -48,6 +48,7 @@ Every time you start a new chat with Cursor, VS Code Copilot, or any MCP-compati
 - [Rust Compiler (n2c)](#rust-compiler-n2c)
 - [Configuration](#configuration)
 - [Contributing](#contributing)
+- [Sponsors](#-sponsors)
 - [Ark — The Last Shield](#ark--the-last-shield)
 - [Arachne — The Greatest Weaver](#arachne--the-greatest-weaver)
 
@@ -839,6 +840,24 @@ Contributions are welcome! Here's how to get started:
 5. Open a Pull Request
 
 Please see [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
+
+## 💖 Sponsors
+
+Soul is free and open-source. These amazing people help keep it alive:
+
+<table>
+  <tr>
+    <td align="center">
+      <a href="https://github.com/sunir">
+        <img src="https://github.com/sunir.png" width="80" height="80" style="border-radius:50%;" alt="Sunir Shah" /><br />
+        <sub><b>Sunir Shah</b></sub>
+      </a><br />
+      <sub>🥇 First Sponsor</sub>
+    </td>
+  </tr>
+</table>
+
+> Become a sponsor → [GitHub Sponsors](https://github.com/sponsors/choihyunsus)
 
 ## Star History
 
