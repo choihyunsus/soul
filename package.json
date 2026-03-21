@@ -1,7 +1,7 @@
 {
     "name": "n2-soul",
-    "version": "6.1.6",
-    "description": "Multi-agent session orchestrator with KV-Cache and Ark for MCP (Model Context Protocol)",
+    "version": "7.0.0",
+    "description": "Multi-agent session orchestrator with KV-Cache, Ark safety, and Arachne code context for MCP",
     "main": "index.js",
     "scripts": {
         "start": "node index.js"
@@ -36,7 +36,9 @@
     },
     "dependencies": {
         "@modelcontextprotocol/sdk": "~1.6.1",
-        "zod": "~3.24.1",
-        "sql.js": "~1.11.0"
+        "better-sqlite3": "^11.10.0",
+        "sql.js": "~1.11.0",
+        "sqlite-vec": "^0.1.7",
+        "zod": "~3.24.1"
     }
 }

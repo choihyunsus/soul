@@ -1,19 +1,21 @@
-// Soul MCP v6.0 — Entry point. Multi-agent session orchestrator with KV-Cache + Ark.
+// Soul MCP v7.0 — Entry point. Multi-agent session orchestrator with KV-Cache + Ark + Arachne.
 const path = require('path');
 const { McpServer } = require('@modelcontextprotocol/sdk/server/mcp.js');
 const { StdioServerTransport } = require('@modelcontextprotocol/sdk/server/stdio.js');
 const { z } = require('zod');
 const config = require('./lib/config');
 const { createArk } = require('./lib/ark');
+const { createArachne } = require('./lib/arachne');
 
 // Sequences — agent lifecycle management
 const { registerBootSequence } = require('./sequences/boot');
 const { registerWorkSequence } = require('./sequences/work');
 const { registerEndSequence } = require('./sequences/end');
 
-// Tools — shared memory + KV-Cache persistence
+// Tools — shared memory + KV-Cache persistence + code context
 const { registerBrainTools } = require('./tools/brain');
 const { registerKVCacheTools } = require('./tools/kv-cache');
+const { registerArachneTools } = require('./tools/arachne');
 
 const pkg = require('./package.json');
 const server = new McpServer({
@@ -57,13 +59,45 @@ server.registerTool = (name, schema, handler) => {
 };
 // ═══ End Ark ═══
 
-// Register all modules (all tools now pass through Ark)
+// Register core modules (all tools pass through Ark)
 registerBootSequence(server, z, config);
 registerWorkSequence(server, z, config);
 registerEndSequence(server, z, config);
 registerBrainTools(server, z, config);
 registerKVCacheTools(server, z, config);
 
-// Start
-const transport = new StdioServerTransport();
-server.connect(transport);
+// ═══════════════════════════════════════════════════════
+// Arachne — THE GREATEST WEAVER
+// Code context assembly engine — indexes codebase,
+// picks exactly what AI needs.
+// Only activates when ARACHNE config is present.
+// ═══════════════════════════════════════════════════════
+async function boot() {
+    // Initialize Arachne (if configured)
+    if (config.ARACHNE?.projectDir) {
+        try {
+            const arachne = await createArachne({
+                dataDir: config.ARACHNE.dataDir ?? path.join(config.DATA_DIR, 'arachne'),
+                projectDir: config.ARACHNE.projectDir,
+                indexing: config.ARACHNE.indexing ?? { autoIndex: true },
+                search: config.ARACHNE.search ?? {},
+                assembly: config.ARACHNE.assembly ?? {},
+                backup: config.ARACHNE.backup ?? {},
+                embedding: config.ARACHNE.embedding ?? {},
+            });
+            registerArachneTools(server, z, arachne, config);
+            console.error(`[n2-soul] Arachne enabled: ${config.ARACHNE.projectDir}`);
+        } catch (err) {
+            console.error(`[n2-soul] Arachne init failed: ${err.message}`);
+        }
+    }
+
+    // Start MCP transport
+    const transport = new StdioServerTransport();
+    await server.connect(transport);
+}
+
+boot().catch(err => {
+    console.error(`[n2-soul] Fatal: ${err.message}`);
+    process.exit(1);
+});
