@@ -69,7 +69,7 @@ server.tool = (name, ...rest) => {
 // ═══ End Ark ═══
 
 // Register core modules (all tools pass through Ark)
-registerBootSequence(server, z, config);
+registerBootSequence(server, z, config, ark);
 registerWorkSequence(server, z, config);
 registerEndSequence(server, z, config);
 registerBrainTools(server, z, config);
