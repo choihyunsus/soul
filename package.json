@@ -1,6 +1,6 @@
 {
     "name": "n2-soul",
-    "version": "7.0.2",
+    "version": "7.0.3",
     "description": "Multi-agent session orchestrator with KV-Cache, Ark safety, and Arachne code context for MCP",
     "main": "index.js",
     "scripts": {
