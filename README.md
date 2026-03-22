@@ -468,23 +468,21 @@ All runtime data is stored in `data/` (gitignored, auto-created):
 
 ```
 soul/
-├── rules/              # Ark safety rules (active)              ← v6.0
-│   └── default.n2          # Default ruleset (125 patterns)
 ├── lib/
-│   ├── ark/            # Ark core engine                        ← v6.0
-│   │   ├── index.js        # createArk() factory
-│   │   ├── gate.js         # SafetyGate engine
-│   │   ├── parser.js       # .n2 rule parser
-│   │   ├── audit.js        # Audit logger
-│   │   └── examples/       # Industry rule templates
-│   └── arachne/        # Arachne code context engine             ← NEW v7.0
-│       ├── index.js        # createArachne() factory
-│       ├── indexer.js      # File scanner + incremental indexing
-│       ├── chunker.js      # Language-aware code chunking
-│       ├── search.js       # BM25 search engine
-│       ├── assembler.js    # Context assembly with token budget
-│       ├── store.js        # SQLite storage (sql.js)
-│       └── ignore.js       # .gitignore + .contextignore support
+│   ├── config.default.js  # Default configuration
+│   ├── soul-engine.js     # Core Soul engine
+│   ├── core-memory.js     # Core Memory (per-agent facts)
+│   ├── entity-memory.js   # Entity Memory (auto-tracked)
+│   ├── intercom-log.js    # Inter-agent communication logs
+│   ├── kv-cache/          # KV-Cache backend
+│   └── utils.js           # Shared utilities
+├── tools/
+│   ├── brain.js           # Brain read/write tools
+│   └── kv-cache.js        # KV-Cache tools
+├── sequences/
+│   ├── boot.js            # Boot sequence
+│   ├── work.js            # Work sequence
+│   └── end.js             # End sequence
 ├── data/
 │   ├── memory/         # Shared brain (n2_brain_read/write)
 │   │   ├── entities.json       # Entity Memory (auto-tracked)
