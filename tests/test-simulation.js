@@ -11,7 +11,7 @@ let pass = 0, fail = 0;
 // ═══════════════════════════════════════
 console.log('\n[1] 버전 동적 로드');
 const pkg = require('../package.json');
-assert(pkg.version === '6.1.3', `package.json version: ${pkg.version}`);
+assert(/\d+\.\d+\.\d+/.test(pkg.version), `package.json version: ${pkg.version}`);
 // boot.js에서 어떻게 사용하는지 검증
 const bootPkg = require('../package.json');
 assert(bootPkg.version === pkg.version, `boot.js도 같은 버전 참조: ${bootPkg.version}`);

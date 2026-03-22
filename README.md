@@ -6,21 +6,8 @@
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg)](https://nodejs.org)
 [![npm downloads](https://img.shields.io/npm/dm/n2-soul.svg)](https://www.npmjs.com/package/n2-soul)
-[![NEW](https://img.shields.io/badge/v7.0-Arachne-9944ff?style=for-the-badge)](https://github.com/choihyunsus/soul#arachne--the-greatest-weaver)
 
 **Your AI agent forgets everything when a session ends. Soul fixes that.**
-**Your AI agent might do something dangerous. Ark stops that.**
-**Your AI agent wastes tokens reading irrelevant code. Arachne fixes that.**
-
-> ### 🚀 What's New in v7.0 — Arachne
->
-> **Arachne** — Code Context Assembly Engine. Indexes your entire codebase and picks **exactly** what your AI needs.
-> ```
-> 50,000 file project → 30 most relevant chunks → 30K tokens (instead of 500K+)
-> ```
-> BM25 search + dependency tracking + smart assembly. Optional semantic search via Ollama. [Learn more →](#arachne--the-greatest-weaver)
->
-> Also includes **Ark** (v6.0) — built-in AI safety that blocks dangerous actions at zero token cost. [Learn more →](#ark--the-last-shield)
 
 Every time you start a new chat with Cursor, VS Code Copilot, or any MCP-compatible AI agent, it starts from zero — no memory of what it did before. Soul is an MCP server that gives your agents:
 
@@ -28,10 +15,11 @@ Every time you start a new chat with Cursor, VS Code Copilot, or any MCP-compati
 - 🤝 **Handoffs** so one agent can pick up where another left off
 - 📝 **Work history** recorded as an immutable log
 - 🗂️ **Shared brain** so multiple agents can read/write the same context
-- 🏷️ **Entity Memory** — auto-tracks people, hardware, projects (v5.0)
-- 💡 **Core Memory** — agent-specific always-loaded facts (v5.0)
-- 🛡️ **Ark** — built-in AI safety that blocks dangerous actions at zero token cost (v6.0)
-- 🕸️ **Arachne** — code context assembly engine that picks exactly what AI needs (v7.0)
+- 🏷️ **Entity Memory** — auto-tracks people, hardware, projects
+- 💡 **Core Memory** — agent-specific always-loaded facts
+
+> 🔌 **Works great with the N2 ecosystem:**
+> [**Ark**](https://github.com/choihyunsus/n2-ark) (AI safety) · [**Arachne**](https://github.com/choihyunsus/n2-arachne) (code context) · [**QLN**](https://github.com/choihyunsus/n2-QLN) (tool routing)
 
 > ⚡ **Soul is one small component of N2 Browser** — an AI-native browser we're building. Multi-agent orchestration, real-time tool routing, inter-agent communication, and much more are currently in testing. This is just the beginning.
 
@@ -47,10 +35,9 @@ Every time you start a new chat with Cursor, VS Code Copilot, or any MCP-compati
 - [Real-World Example](#real-world-example)
 - [Rust Compiler (n2c)](#rust-compiler-n2c)
 - [Configuration](#configuration)
+- [N2 Ecosystem](#-n2-ecosystem)
 - [Contributing](#contributing)
 - [Sponsors](#-sponsors)
-- [Ark — The Last Shield](#ark--the-last-shield)
-- [Arachne — The Greatest Weaver](#arachne--the-greatest-weaver)
 
 ## Quick Start
 
@@ -246,9 +233,7 @@ n2_work_end(project, title, summary, todo, entities, insights)
 | **Dual Backend** | JSON (zero deps) or SQLite for performance |
 | **Semantic Search** | Optional Ollama embedding (nomic-embed-text) |
 | **Backup/Restore** | Incremental backups with configurable retention |
-| **Ark** | 🆕 Built-in AI safety — blocks dangerous actions at zero token cost |
-| **Arachne** | 🆕 Code context assembly — indexes codebase, picks exactly what AI needs (v7.0) |
-| **Cloud Storage** | 🆕 Store memory anywhere — Google Drive, NAS, network server, any path (v6.1) |
+| **Cloud Storage** | Store memory anywhere — Google Drive, NAS, network server, any path |
 
 ## ☁️ Cloud Storage — Store Your AI Memory Anywhere
 
@@ -327,315 +312,21 @@ Want to archive 2025's logs? Just zip the `2025` folder. Want to delete logs old
 ### 3. OS-Level Sovereignty
 Because Soul's "cloud" is just your local filesystem mapped to a sync drive, you can use standard OS tools (cron jobs, Windows Task Scheduler, bash scripts) to enforce retention policies. If you delete a project folder, the project is gone. No dangling DB rows.
 
-## Ark — The Last Shield
+## 🔌 N2 Ecosystem
 
-![Ark Comic](docs/ark-comic.png)
+Soul works great standalone, but becomes even more powerful with the N2 ecosystem:
 
-**The Last Shield** — Soul v6.0 includes **Ark**, a built-in AI safety system. Like Noah's Ark — the last refuge when everything else fails.
+| Package | What it does | npm |
+|---------|-------------|-----|
+| [**Ark**](https://github.com/choihyunsus/n2-ark) | AI safety — blocks dangerous actions at zero token cost | `n2-ark` |
+| [**Arachne**](https://github.com/choihyunsus/n2-arachne) | Code context assembly — 333x compression | `n2-arachne` |
+| [**QLN**](https://github.com/choihyunsus/n2-QLN) | Tool routing — 1000+ tools → 1 router | `n2-qln` |
+| [**Clotho**](https://github.com/choihyunsus/n2-clotho) | Rule compiler — `.n2` → SQL + state machines | `n2-clotho` |
 
-### Why Ark?
+> Every package works **100% standalone**. Install only what you need.
 
-| | Ark | LLM-based safety | Embedding-based |
-|---|:---:|:---:|:---:|
-| **Token cost** | 0 | 500~2,000 per check | 100~500 per check |
-| **Latency** | < 1ms | 1~5 seconds | 200~500ms |
-| **New dependencies** | 0 (pure JS) | LLM API key required | Vector DB required |
-| **Works offline** | Yes | No | Depends |
-| **Always on** | Mandatory (no toggle) | Optional | Optional |
-| **Self-protection** | 4-layer anti-tampering | None | None |
-| **Rule format** | Human-readable `.n2` files | Prompt engineering | Embedding tuning |
-| **Industry templates** | 7 domains included | Write your own | Write your own |
-| **Audit trail** | Every block/pass logged | Varies | Varies |
-| **Setup** | Zero config (works out of box) | API keys + prompts | DB + embeddings |
-| **MCP compatible** | Any host (Cursor, VS Code, Claude Desktop) | Host-specific | Host-specific |
-
-### The Problem
-
-AI agents with tool access can execute dangerous commands:
-- `rm -rf /` — delete everything
-- `DROP DATABASE` — destroy data
-- `npm install -g malware` — supply chain attack
-- `git push --force` — destroy history
-- Send emails, make payments, exfiltrate data
-
-These aren't hypothetical. Autonomous agents (Manus, Devin, etc.) have already done these things in the wild.
-
-### How Ark Works
-
-```
-Agent calls tool  →  MCP Server receives request
-                            │
-                     ark.check(name, content)
-                            │
-                    ┌───────┴───────┐
-                    │ Match rules? │
-                    └───┬───┬───┘
-                   No │   │ Yes
-                      │   │
-               Execute │   │ BLOCKED
-               handler │   │ "This action requires
-                      │   │  human approval."
-```
-
-**Key properties:**
-- **Zero token cost** — Pure regex matching in Node.js, no LLM calls
-- **Zero latency** — Microsecond execution time
-- **Always on** — No `enabled` toggle. Ark loads unconditionally at boot
-- **Transparent** — Agents don't even know it's there until blocked
-- **Auditable** — Every block and pass is logged
-
-### Token Cost: Zero
-
-**Why zero?** Because Ark runs **inside the MCP server** (Node.js), not inside the AI model.
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                    LLM (Cloud)                          │
-│         AI agent thinks, generates tool calls           │
-│              (this is where tokens are used)             │
-└──────────────────────┬──────────────────────────────────┘
-                       │ tool call
-                       ▼
-┌──────────────────────────────────────────────────────────┐
-│                MCP Server (Node.js, local)               │
-│                                                          │
-│   ┌──────────────┐                                       │
-│   │  ark.check()  │ ◄── pure regex, runs HERE            │
-│   │  < 1ms        │     no network, no LLM, no tokens    │
-│   └──────┬───────┘                                       │
-│          │                                               │
-│     allowed? ──No──► return "BLOCKED" text                │
-│          │                                               │
-│         Yes                                              │
-│          │                                               │
-│     execute handler                                      │
-└──────────────────────────────────────────────────────────┘
-```
-
-The key insight: **token cost only occurs inside the LLM**. Ark lives one layer below — at the server level. The LLM sends a tool call, and Ark checks it using regex before the handler runs. No second LLM call, no API request, no vector search. Just string matching.
-
-Most AI safety solutions work like this:
-```
-Agent → "I want to run rm -rf /" → Safety LLM: "Is this safe?" → 2,000 tokens burned
-```
-
-Ark works like this:
-```
-Agent → "I want to run rm -rf /" → regex match → BLOCKED (0 tokens, < 1ms)
-```
-
-| Approach | How it works | Cost per check | Latency |
-|----------|-------------|:--------------:|:-------:|
-| **LLM-based safety** | Send action to another LLM for review | 500~2,000 tokens | 1~5s |
-| **Embedding-based** | Vectorize + similarity search | 100~500 tokens | 200~500ms |
-| **Ark** | Regex pattern matching in Node.js | **0 tokens** | **< 1ms** |
-
-Over 100 tool calls per session, that's **50,000~200,000 tokens saved** compared to LLM-based safety.
-
-### Rule Files (.n2)
-
-Safety rules are defined in `.n2` files in the `rules/` directory:
-
-```n2
-# Block catastrophic system destruction
-@rule catastrophic_destruction {
-    scope: all
-    blacklist: [
-        /rm\s+-rf\s+\//,
-        /DROP\s+DATABASE/i,
-        /git\s+push\s+--force/i
-    ]
-    requires: human_approval
-}
-
-# State machine: no payment without approval chain
-@contract payment_sequence {
-    idle -> reviewing : on payment_request
-    reviewing -> approved : on payment_approval
-    approved -> executing : on execute_payment
-}
-
-# Named actions that always require approval
-@gate high_risk_actions {
-    actions: [deploy_production, delete_database, send_email]
-    requires: human_approval
-}
-```
-
-Three rule types:
-
-| Type | Purpose | Example |
-|------|---------|--------|
-| `@rule` | Pattern blacklist | Block `rm -rf /`, `DROP DATABASE` |
-| `@contract` | State machine | Enforce payment → approval → execute order |
-| `@gate` | Named action gate | `send_email` always requires approval |
-
-### Industry Templates
-
-Soul ships with domain-specific rule templates in `lib/ark/examples/`:
-
-| File | Domain | Key protections |
-|------|--------|-----------------|
-| `medical.n2` | Healthcare | Prescription/surgical sequences, patient data (HIPAA) |
-| `military.n2` | Defense | Engagement protocols, nuclear dual-key, classified data |
-| `financial.n2` | Finance | Payment sequences, transaction approval |
-| `legal.n2` | Legal | Contract/litigation sequences |
-| `privacy.n2` | Privacy | GDPR/CCPA, PII protection |
-| `autonomous.n2` | Autonomous | Self-driving/drone safety |
-| `system.n2` | DevOps | Deployment sequences, infrastructure |
-
-Copy any template to `rules/` to activate:
-```bash
-cp lib/ark/examples/medical.n2 rules/
-```
-
-### Self-Protection (4 Layers)
-
-Ark protects itself from being disabled by a rogue AI:
-
-1. **Layer 1**: Any `.n2` file reference → blocked
-2. **Layer 2**: `delete/modify/disable n2-ark` → blocked
-3. **Layer 3**: Core filenames (`gate.js`, `parser.js`) → blocked
-4. **Layer 4**: Soul core files (`index.js`, `config`) → blocked
-
-A rogue agent hitting all four layers gets error after error after error.
-
-### Configuration
-
-Ark settings in `lib/config.default.js`:
-
-```js
-ARK: {
-    rulesDir: null,     // null = soul/rules/ (default)
-    auditDir: null,     // null = soul/data/ark-audit/
-    strictMode: false,  // true = block unknown actions too
-}
-```
-
-Override in `lib/config.local.js` to swap rule sets:
-```js
-module.exports = {
-    ARK: {
-        rulesDir: '/path/to/your/custom/rules',  // Your industry rules
-        strictMode: true,                         // Maximum security
-    },
-};
-```
-
-> **Note:** There is no `enabled: false` option. This is by design. The lock cannot unlock itself.
-
-### Security Philosophy
-
-**Transparency of `.n2` Rules**: Safety rules are **intentionally public and auditable**. This is by design — users should be able to read, customize, and verify exactly what is being blocked. There are no hidden rules, no obfuscated patterns, and no "trust us" black boxes. Open rules build trust.
-
-**Secrets stay local**: `config.local.js` is gitignored and never distributed. It exists only on the user's machine. Soul does not transmit, store, or process any API keys, passwords, or credentials.
-
-**Storage sovereignty**: All data (ledger, memory, audit logs) stays on **your machine**. You choose where backups go — local SQLite, Google Drive folder, or your own cloud. Soul never phones home.
-
-**Defense in Depth**: For production use, pair Ark with OS-level read-only permissions on `.n2` rule files. Ark provides the active gate; the OS provides the final lock. No single layer is perfect — but together, they cover each other's gaps.
-
-**Input Normalization** (v6.1.3): Ark normalizes all input before pattern matching — stripping backslash escapes (`r\m` → `rm`), collapsing whitespace, and removing quotes. Obfuscation attacks that trick simple regex are caught at the gate.
-
-**Multi-Vector Defense** (v6.1.3): Ark now covers three additional attack vectors:
-- **Script bypass** — blocks `bash *.sh`, `python *.py`, `eval()`, `child_process` (second-order execution)
-- **Wildcard destruction** — blocks `rm *`, `find -delete`, `xargs rm` (self-protection bypass)
-- **Command execution gate** — `@gate` on `execute_command`, `run_shell`, etc. (whitelist approach)
-
-## Arachne — The Greatest Weaver
-
-> *In Greek mythology, Arachne was a mortal weaver whose tapestries rivaled the gods. She wove exactly the right threads in exactly the right places.*
-
-**Arachne** is Soul's code context assembly engine. It indexes your entire codebase and picks **exactly** the chunks your AI agent needs — no more, no less.
-
-### The Problem
-
-AI agents waste massive tokens reading irrelevant code:
-
-| Approach | Tokens used | Relevance |
-|----------|:----------:|:---------:|
-| **Paste entire file** | 10,000+ | ~20% relevant |
-| **Dump whole project** | 500,000+ | ~5% relevant |
-| **Arachne** | ~14,000 | **~90% relevant** |
-
-### Real-World Benchmark (N2 Browser Project)
-
-| Metric | Value |
-|--------|:-----:|
-| **Project size** | 3,219 files, 4.68M tokens |
-| **Arachne output** | 14,074 tokens |
-| **Compression** | **333x** (99.7% reduction) |
-| **Index time** | 627ms (incremental: 0ms) |
-| **DB size** | 24 MB |
-
-### How Arachne Works
-
-```
-Your 50,000-file project
-         │
-    ┌────┴────┐
-    │  Index   │ ← Scans all files, chunks by function/class
-    │  (boot)  │   Incremental: only re-indexes changed files
-    └────┬────┘
-         │
-    ┌────┴────┐
-    │  Search  │ ← BM25 keyword search (+ optional semantic via Ollama)
-    │  (query) │   Finds the most relevant chunks across all files
-    └────┬────┘
-         │
-    ┌────┴────┐
-    │ Assemble │ ← Picks top chunks within your token budget
-    │ (budget) │   4 layers: fixed + short-term + associative + spare
-    └────┬────┘
-         │
-   30 most relevant
-   code chunks → AI
-```
-
-### Key Features
-
-| Feature | Description |
-|---------|------------|
-| **Incremental Indexing** | Only re-indexes changed files (hash-based detection) |
-| **Language-Aware Chunking** | Splits code by function/class boundaries, not arbitrary lines |
-| **BM25 Search** | Fast keyword search with TF-IDF ranking |
-| **Semantic Search** | Optional Ollama embeddings (nomic-embed-text) |
-| **Token Budget Assembly** | Smart context assembly within configurable token limits |
-| **4-Layer Assembly** | Fixed (10%) + Short-term (30%) + Associative (40%) + Spare (20%) |
-| **17 Languages** | JS, TS, Python, Rust, Go, Java, C/C++, C#, Ruby, PHP, Swift, Kotlin |
-| **12 Text Formats** | MD, JSON, YAML, XML, HTML, CSS, SQL, Shell scripts |
-| **Backup/Restore** | Incremental backups with configurable retention |
-
-### Configuration
-
-Arachne settings in `lib/config.default.js`:
-
-```js
-ARACHNE: {
-    projectDir: null,         // Set to your project root to enable
-    indexing: {
-        autoIndex: true,      // Auto-index on boot
-        maxFileSize: 512 * 1024,
-    },
-    assembly: {
-        defaultBudget: 30000, // Token budget for context
-    },
-    embedding: {
-        enabled: false,       // true = requires: ollama pull nomic-embed-text
-    },
-}
-```
-
-### Usage
-
-```
-n2_arachne(action: "index")     → Index your project files
-n2_arachne(action: "search", query: "authentication JWT")  → Search code
-n2_arachne(action: "assemble", query: "how does auth work?", budget: 30000)  → Full context assembly
-n2_arachne(action: "status")    → Check index status
-n2_arachne(action: "backup")    → Backup index DB
-```
-
-> **Also available as standalone package:** [`n2-arachne`](https://www.npmjs.com/package/n2-arachne) — use Arachne without Soul.
+> [!NOTE]
+> **Migration from v7.x**: Ark and Arachne were previously bundled inside Soul. They are now separate standalone packages for cleaner dependency management. If you were using them, install them individually: `npm install n2-ark n2-arachne`
 
 ## Available Tools
 
@@ -660,7 +351,6 @@ n2_arachne(action: "backup")    → Backup index DB
 | `n2_kv_backup` | Backup to portable SQLite DB |
 | `n2_kv_restore` | Restore from backup |
 | `n2_kv_backup_list` | List backup history |
-| `n2_arachne` | 🆕 Code context: index, search, assemble, backup, status (v7.0) |
 
 ## KV-Cache Progressive Loading
 
@@ -809,8 +499,6 @@ soul/
 │   │       └── ledger/            # Immutable work logs
 │   │           └── 2026/03/09/
 │   │               └── 001-agent.json
-│   ├── ark-audit/      # Ark block/pass logs                   ← v6.0
-│   ├── arachne/        # Arachne index DB + embeddings          ← NEW v7.0
 │   └── kv-cache/       # Session snapshots
 │       ├── snapshots/  # JSON backend
 │       ├── sqlite/     # SQLite backend
