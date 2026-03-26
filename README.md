@@ -6,7 +6,7 @@
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg)](https://nodejs.org)
 [![npm downloads](https://img.shields.io/npm/dm/n2-soul.svg)](https://www.npmjs.com/package/n2-soul)
-[![v8.0.0](https://img.shields.io/badge/v8.0.0-Forgetting%20Curve-blueviolet.svg)](#whats-new-in-v80)
+[![v9.0.0](https://img.shields.io/badge/v9.0.0-Strict%20TypeScript-blueviolet.svg)](#whats-new-in-v90)
 
 **Your AI agent forgets everything when a session ends. Soul fixes that.**
 
@@ -26,73 +26,41 @@ Every time you start a new chat with Cursor, VS Code Copilot, or any MCP-compati
 
 ## Table of Contents
 
-- [What's New in v8.0](#whats-new-in-v80)
+- [What's New in v9.0](#whats-new-in-v90)
 - [Quick Start](#quick-start)
 - [Why Soul?](#why-soul)
-- [Token Efficiency](#token-efficiency)
-- [How It Works](#how-it-works)
 - [Features](#features)
 - [Cloud Storage](#️-cloud-storage--store-your-ai-memory-anywhere)
 - [Available Tools](#available-tools)
-- [Real-World Example](#real-world-example)
-- [Rust Compiler (n2c)](#rust-compiler-n2c)
 - [Configuration](#configuration)
-- [N2 Ecosystem](#-n2-ecosystem)
 - [Contributing](#contributing)
-- [Sponsors](#-sponsors)
+- [Changelog](CHANGELOG.md)
 
-## What's New in v8.0
+## What's New in v9.0
 
-> **Forgetting Curve — Soul now remembers what matters and forgets what doesn't.**
+> **Strict TypeScript — Zero `any`, zero memory leaks, automated quality enforcement.**
 
-### 🧠 Intelligent Memory (Forgetting Curve GC)
+### 🔒 Full TypeScript Strict Mode
 
-Inspired by Ebbinghaus' forgetting curve, Soul v8.0 intelligently manages memory retention:
+- Source code migrated to TypeScript with `strict: true`
+- **Zero `any`** — every type is explicit and verifiable
+- ESLint `strictTypeChecked` rules catch floating promises, type safety violations
+- 30 unit tests with `npm run verify` one-command pipeline
 
-```
-retention = importance × (1 + log₂(1 + accessCount)) × e^(−λ × ageDays)
-```
+### 🛡️ Security & Memory Audit
 
-- **Frequently accessed** sessions are kept longer
-- **Important** snapshots resist decay
-- **Stale** memory is automatically pruned via 3-tier lifecycle:
+- WASM memory leak fix — `stmt.free()` wrapped in `try/finally`
+- Silent error swallowing eliminated — all `.catch()` handlers log errors
+- HTTP response size limits for embedding requests
+- `dispose()` methods for proper timer cleanup
 
-| Tier | Age | Storage |
-|------|-----|--------|
-| 🔴 Hot | 0–7 days | In-memory cache + disk |
-| 🟡 Warm | 8–30 days | Disk only |
-| 🔵 Cold | 30+ days | Archived (compressed) |
+### 🧠 v8.0 Features (Included)
 
-### ⚡ Performance Revolution — Async I/O
+- **Forgetting Curve GC** — intelligent memory retention based on access patterns
+- **Async I/O** — non-blocking operations, 42% faster KV load
+- **3-tier memory** — Hot → Warm → Cold lifecycle
 
-All hot-path I/O operations are now fully asynchronous:
-
-| Operation | v7 (sync) | v8 (async) | Improvement |
-|-----------|-----------|------------|-------------|
-| KV Save | Blocks event loop | Non-blocking | ∞ (no block) |
-| KV Load | 1.2ms (blocking) | 0.7ms (async) | 42% faster |
-| KV Search | Blocks | Parallel | 3x+ throughput |
-| GC | Blocks during sweep | Background | Non-disruptive |
-
-### 🔧 SDK Native Migration
-
-- Removed legacy `registerTool` shim → direct `server.tool()` API
-- Strict schema validation: `z.any()` eliminated from all tool definitions
-- Full MCP SDK v1.6.1 compatibility
-
-### 📦 Schema v2 (Backward Compatible)
-
-Snapshots now include Forgetting Curve metadata. Existing v1 snapshots are **auto-migrated** on first load:
-
-```diff
-+ accessCount: 0        // How often this snapshot was accessed
-+ lastAccessed: null     // When it was last loaded
-+ importance: 0.5        // 0.0–1.0 importance score
-+ tier: 'warm'           // hot / warm / cold
-```
-
-> [!NOTE]
-> **Upgrading from v7.x**: Zero breaking changes. All existing data works as-is. Snapshots are transparently migrated to schema v2 on first access.
+> See [CHANGELOG.md](CHANGELOG.md) for full version history.
 
 ---
 

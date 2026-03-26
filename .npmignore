@@ -1,9 +1,14 @@
-# npm 배포 시 제외할 파일
+# npm 배포 시 제외할 파일 (dist/ 만 배포)
+src/
 docs/
-!docs/soul-v8-roadmap.md
 data/
+tests/
 .git/
 .gitignore
+.github/
 node_modules/
+tsconfig.json
+eslint.config.mjs
+CONTRIBUTING.md
 *.png
 *.jpg

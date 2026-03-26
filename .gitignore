@@ -1,4 +1,7 @@
-# Soul MCP — gitignore
+# Soul MCP .gitignore
+# Build output (compiled from src/)
+dist/
+
 # Local config (never commit)
 lib/config.local.js
 

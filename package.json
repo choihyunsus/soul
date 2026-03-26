@@ -1,10 +1,19 @@
 {
     "name": "n2-soul",
-    "version": "8.0.0",
+    "version": "9.0.0",
     "description": "AI agent memory & session orchestrator for MCP — persistent KV-Cache, Soul Board, immutable Ledger",
-    "main": "index.js",
+    "main": "dist/index.js",
+    "types": "dist/index.d.ts",
     "scripts": {
-        "start": "node index.js"
+        "build": "tsc",
+        "start": "node dist/index.js",
+        "dev": "tsc --watch",
+        "typecheck": "tsc --noEmit",
+        "lint": "eslint src/",
+        "lint:fix": "eslint src/ --fix",
+        "test": "node --test dist/tests/*.test.js",
+        "verify": "npm run typecheck && npm run build && npm run test",
+        "prepublishOnly": "npm run build"
     },
     "keywords": [
         "mcp",
@@ -19,7 +28,7 @@
         "persistent-memory",
         "ai-safety",
         "safety",
-        "n2-ark"
+        "typescript"
     ],
     "license": "SEE LICENSE IN LICENSE",
     "homepage": "https://nton2.com",
@@ -40,5 +49,13 @@
         "sql.js": "~1.11.0",
         "sqlite-vec": "^0.1.7",
         "zod": "~3.24.1"
+    },
+    "devDependencies": {
+        "@eslint/js": "^10.0.1",
+        "@types/better-sqlite3": "^7.6.13",
+        "@types/node": "^22.19.15",
+        "eslint": "^10.1.0",
+        "typescript": "^5.9.3",
+        "typescript-eslint": "^8.57.2"
     }
 }
