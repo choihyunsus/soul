@@ -1,18 +1,27 @@
-# npm 배포 시 제외할 파일 (dist/ 만 배포)
-src/
-docs/
-data/
-tests/
-lib/
-sequences/
-tools/
-index.js
-.git/
-.gitignore
-.github/
-node_modules/
-tsconfig.json
-eslint.config.mjs
-CONTRIBUTING.md
+# npm publish: only ship dist/, package.json, README, LICENSE, CHANGELOG
+# Leading slashes anchor patterns to the package root so they do NOT
+# match identically-named directories inside dist/.
+
+# Source (TypeScript)
+/src/
+
+# Documentation & CI
+/docs/
+/.git/
+/.github/
+/.gitignore
+/CONTRIBUTING.md
+
+# Runtime data (generated at first run)
+/data/
+
+# Dev config
+/tsconfig.json
+/eslint.config.mjs
+
+# Compiled tests (not needed by consumers)
+dist/tests/
+
+# Images (not needed in package)
 *.png
 *.jpg

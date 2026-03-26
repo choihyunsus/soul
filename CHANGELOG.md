@@ -2,6 +2,17 @@
 
 All notable changes to Soul are documented here.
 
+## [9.0.2] — 2026-03-27
+
+### Packaging Fix
+
+#### Fixed
+- **CRITICAL**: `.npmignore` excluded `dist/lib/`, `dist/sequences/`, `dist/tools/`, and `dist/index.js` — npm installs failed with `Cannot find module './lib/config'` ([#issue](https://github.com/choihyunsus/soul/issues))
+- Root-anchored all ignore patterns with leading `/` so they no longer match inside `dist/`
+- Removed compiled test files (`dist/tests/`) from the published tarball (88 files, down from 100)
+
+---
+
 ## [9.0.0] — 2026-03-26
 
 ### 🔒 Strict TypeScript Migration
