@@ -5,12 +5,8 @@ import path from 'path';
 import { createSession, migrateSession } from './schema';
 import type { SessionData, SessionInput } from './schema';
 import type { SnapshotTier } from '../../types';
+import type { StorageAdapter, GCResult } from './storage-adapter';
 import { logError } from '../utils';
-
-interface GCResult {
-  deleted: number;
-  tiered: { hot: number; warm: number; cold: number };
-}
 
 interface ScoredSnapshot extends SessionData {
   _score: number;
@@ -44,7 +40,7 @@ export function calculateRetention(snap: SessionData): number {
 }
 
 /** Snapshot engine for session persistence */
-export class SnapshotEngine {
+export class SnapshotEngine implements StorageAdapter {
   private readonly baseDir: string;
 
   constructor(baseDir: string) {

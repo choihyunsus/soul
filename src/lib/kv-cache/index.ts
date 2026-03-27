@@ -12,6 +12,7 @@ import { BackupManager } from './backup';
 import type { BackupResult, RestoreResult, ManifestEntry, BackupStatusResult } from './backup';
 import type { SessionData } from './schema';
 import type { KVCacheConfig } from '../../types';
+import type { StorageAdapter } from './storage-adapter';
 
 interface LoadOptions {
   level?: string;
@@ -54,10 +55,10 @@ const DEFAULT_SEARCH_TOKEN_BUDGET = 500;
 /** Creates the appropriate storage engine based on config */
 function createStorageEngine(
   dataDir: string, config: Partial<KVCacheConfig>,
-): { engine: SnapshotEngine | TierManager; readyPromise: Promise<void> } {
+): { engine: StorageAdapter; readyPromise: Promise<void> } {
   const backend = config.backend || 'json';
   const snapshotDir = config.snapshotDir || path.join(dataDir, 'kv-cache', 'snapshots');
-  let engine: SnapshotEngine;
+  let engine: StorageAdapter;
   let readyPromise: Promise<void> = Promise.resolve();
 
   if (backend === 'sqlite') {
@@ -65,10 +66,11 @@ function createStorageEngine(
       // NOTE: require() kept — synchronous function cannot use dynamic import()
       const { SqliteStore, initSqlJs } = require('./sqlite-store') as typeof import('./sqlite-store');
       const sqliteDir = config.sqliteDir || path.join(dataDir, 'kv-cache', 'sqlite');
-      engine = new SqliteStore(sqliteDir) as unknown as SnapshotEngine;
-      readyPromise = initSqlJs().then(() => {
-        (engine as unknown as Record<string, boolean>)._ready = true;
-      }).catch((e: unknown) => {
+      const sqliteEngine = new SqliteStore(sqliteDir);
+      engine = sqliteEngine;
+      readyPromise = initSqlJs().then(() =>
+        sqliteEngine.init(),
+      ).catch((e: unknown) => {
         const msg = e instanceof Error ? e.message : String(e);
         console.error(`[kv-cache] SQLite init failed: ${msg}`);
       });
@@ -103,7 +105,7 @@ interface McpSaveInput {
 
 /** Main KV-Cache orchestrator */
 export class SoulKVCache {
-  readonly snapshot: SnapshotEngine | TierManager;
+  readonly snapshot: StorageAdapter;
   private readonly dataDir: string;
   private readonly config: KVCacheInternalConfig;
   private readonly embedding: EmbeddingEngine | null;
@@ -218,8 +220,8 @@ export class SoulKVCache {
     if (!snap) return null;
 
     // Forgetting Curve: track access
-    if (snap.id && 'touch' in this.snapshot) {
-      (this.snapshot as TierManager).touch(snap.projectName || project, snap.id).catch((e: unknown) => logError('kv-cache:touch', e));
+    if (snap.id) {
+      this.snapshot.touch(snap.projectName || project, snap.id).catch((e: unknown) => logError('kv-cache:touch', e));
     }
 
     const level = options.level || 'auto';

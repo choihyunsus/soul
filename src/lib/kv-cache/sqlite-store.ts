@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { createSession } from './schema';
 import type { SessionData, SessionInput, SessionContext } from './schema';
+import type { StorageAdapter, GCResult } from './storage-adapter';
 
 // sql.js types (WASM-based database)
 interface SqlJsModule {
@@ -35,10 +36,7 @@ interface DbEntry {
   path: string;
 }
 
-interface GCResult {
-  deleted: number;
-  tiered?: { hot: number; warm: number; cold: number };
-}
+// GCResult imported from storage-adapter.ts
 
 interface ScoredSession extends SessionData {
   _score: number;
@@ -64,7 +62,7 @@ export async function initSqlJs(): Promise<SqlJsModule> {
 }
 
 /** SQLite-backed snapshot storage using sql.js (pure JavaScript WASM) */
-export class SqliteStore {
+export class SqliteStore implements StorageAdapter {
   private readonly baseDir: string;
   private _dbs: Record<string, DbEntry>;
   private _ready: boolean;
@@ -151,7 +149,7 @@ export class SqliteStore {
   }
 
   /** Save a session snapshot */
-  save(session: SessionInput): string {
+  async save(session: SessionInput): Promise<string> {
     const s = createSession(session);
     s.endedAt = s.endedAt || new Date().toISOString();
 
@@ -174,13 +172,13 @@ export class SqliteStore {
   }
 
   /** Load the most recent snapshot */
-  loadLatest(projectName: string): SessionData | null {
-    const results = this.list(projectName, 1);
+  async loadLatest(projectName: string): Promise<SessionData | null> {
+    const results = await this.list(projectName, 1);
     return results.length > 0 ? (results[0] ?? null) : null;
   }
 
   /** Load a specific snapshot by ID */
-  loadById(projectName: string, snapshotId: string): SessionData | null {
+  async loadById(projectName: string, snapshotId: string): Promise<SessionData | null> {
     const db = this._getDb(projectName);
     const results = db.exec('SELECT * FROM snapshots WHERE id = ?', [snapshotId]);
     if (results.length === 0 || !results[0] || results[0].values.length === 0) return null;
@@ -188,7 +186,7 @@ export class SqliteStore {
   }
 
   /** List snapshots sorted by recency */
-  list(projectName: string, limit: number = 10): SessionData[] {
+  async list(projectName: string, limit: number = 10): Promise<SessionData[]> {
     const db = this._getDb(projectName);
     const results = db.exec(`
       SELECT * FROM snapshots
@@ -203,7 +201,7 @@ export class SqliteStore {
   }
 
   /** Search snapshots by keyword (LIKE-based) */
-  search(query: string, projectName: string, limit: number = 10): ScoredSession[] {
+  async search(query: string, projectName: string, limit: number = 10): Promise<ScoredSession[]> {
     const db = this._getDb(projectName);
     const keywords = query.toLowerCase().split(/\s+/).filter(k => k.length >= 2);
     if (keywords.length === 0) return [];
@@ -241,7 +239,7 @@ export class SqliteStore {
   }
 
   /** Forgetting Curve GC — retention score determines survival */
-  gc(projectName: string, maxAgeDays: number = 30, maxCount: number = 50): GCResult {
+  async gc(projectName: string, maxAgeDays: number = 30, maxCount: number = 50): Promise<GCResult> {
     const db = this._getDb(projectName);
 
     // Load all snapshots for this project
@@ -317,6 +315,22 @@ export class SqliteStore {
     };
   }
 
+  /** Touch a snapshot — increment access count, update lastAccessed */
+  async touch(projectName: string, snapshotId: string): Promise<boolean> {
+    const snap = await this.loadById(projectName, snapshotId);
+    if (!snap) return false;
+
+    const db = this._getDb(projectName);
+    const now = new Date().toISOString();
+    const newCount = (snap.accessCount || 0) + 1;
+    db.run(
+      'UPDATE snapshots SET context = json_set(context, "$.accessCount", ?, "$.lastAccessed", ?) WHERE id = ?',
+      [newCount, now, snapshotId],
+    );
+    this._persist(projectName);
+    return true;
+  }
+
   /** Close all connections and persist */
   dispose(): void {
     for (const [name, entry] of Object.entries(this._dbs)) {
@@ -327,7 +341,7 @@ export class SqliteStore {
   }
 
   /** Migrate JSON snapshots to SQLite */
-  migrateFromJson(jsonBaseDir: string, projectName: string): { migrated: number; errors: number } {
+  async migrateFromJson(jsonBaseDir: string, projectName: string): Promise<{ migrated: number; errors: number }> {
     const projectDir = path.join(jsonBaseDir, projectName);
     if (!fs.existsSync(projectDir)) return { migrated: 0, errors: 0 };
 
@@ -343,7 +357,7 @@ export class SqliteStore {
       for (const file of files) {
         try {
           const raw = fs.readFileSync(path.join(dateDir, file), 'utf-8');
-          this.save(JSON.parse(raw) as SessionInput);
+          await this.save(JSON.parse(raw) as SessionInput);
           migrated++;
         } catch { errors++; }
       }

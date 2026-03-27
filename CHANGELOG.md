@@ -2,6 +2,32 @@
 
 All notable changes to Soul are documented here.
 
+## [9.0.6] — 2026-03-27
+
+### StorageAdapter — Unified Backend Interface
+
+Eliminated all B2 (unsafe cast) technical debt in the KV-Cache module by introducing a shared `StorageAdapter` interface.
+
+#### Added
+- **`StorageAdapter` interface** (`storage-adapter.ts`) — common contract for all storage backends (save, load, list, search, gc, touch, dispose)
+- **`SqliteStore.touch()`** — Forgetting Curve access tracking for SQLite backend (previously only available in JSON backend)
+
+#### Fixed
+- **B2 BLOCKER**: `SqliteStore as unknown as SnapshotEngine` unsafe cast removed — both now implement `StorageAdapter`
+- **B2 BLOCKER**: `engine as unknown as Record<string, boolean>` internal state hack removed — proper `init()` flow via interface
+- **B2 BLOCKER**: `target as 'json' | 'sqlite'` in restore tool — replaced with runtime validation
+
+#### Changed
+- `SqliteStore` methods now `async` to match `StorageAdapter` contract (no behavior change — sql.js is synchronous internally)
+- `TierManager` constructor accepts `StorageAdapter` instead of `SnapshotEngine` directly
+- `SoulKVCache.snapshot` type changed from `SnapshotEngine | TierManager` to `StorageAdapter`
+- Forgetting Curve `touch()` now called unconditionally (no more `'touch' in this.snapshot` runtime check)
+
+#### Why This Matters
+The `as unknown as` pattern breaks TypeScript's type safety guarantees — the compiler cannot verify correctness across the cast boundary. By introducing a shared interface, all three backends (SnapshotEngine, SqliteStore, TierManager) are now provably type-compatible at compile time.
+
+---
+
 ## [9.0.2] — 2026-03-27
 
 ### Packaging Fix

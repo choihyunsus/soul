@@ -1,7 +1,7 @@
 // Soul KV-Cache v9.0 — Tiered storage manager. Hot/Warm/Cold lifecycle.
 import type { SessionData, SessionInput } from './schema';
 import type { SnapshotTier } from '../../types';
-import type { SnapshotEngine } from './snapshot';
+import type { StorageAdapter } from './storage-adapter';
 
 interface TierSpec {
   name: string;
@@ -45,13 +45,13 @@ const MAX_HOT_PER_PROJECT = 20;
  * TierManager wraps a storage engine and adds tiered caching.
  * Hot tier snapshots are kept in memory for fast access.
  */
-export class TierManager {
-  private readonly engine: SnapshotEngine;
+export class TierManager implements StorageAdapter {
+  private readonly engine: StorageAdapter;
   private readonly hotDays: number;
   private readonly warmDays: number;
   private _hotCache: Record<string, Record<string, SessionData>>;
 
-  constructor(storageEngine: SnapshotEngine, config: TierConfig = {}) {
+  constructor(storageEngine: StorageAdapter, config: TierConfig = {}) {
     this.engine = storageEngine;
     this.hotDays = config.hotDays ?? TIERS['HOT']?.maxAgeDays ?? 7;
     this.warmDays = config.warmDays ?? TIERS['WARM']?.maxAgeDays ?? 30;

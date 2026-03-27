@@ -212,7 +212,10 @@ function _registerKVRestore(server: McpToolServer, z: typeof ZodType, kvCache: S
     },
     async ({ project, backupId, target }: KVRestoreInput) => {
       try {
-        const result = await kvCache.restore(project, backupId, { target: target as 'json' | 'sqlite' | undefined });
+        const validTargets = ['json', 'sqlite'] as const;
+        type RestoreTarget = typeof validTargets[number];
+        const safeTarget: RestoreTarget | undefined = validTargets.includes(target as RestoreTarget) ? target as RestoreTarget : undefined;
+        const result = await kvCache.restore(project, backupId, { target: safeTarget });
         if (result.error) return { content: [{ type: 'text', text: `KV-Cache restore error: ${result.error}` }] };
         return {
           content: [{
