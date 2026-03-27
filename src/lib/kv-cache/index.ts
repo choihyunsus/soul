@@ -234,7 +234,7 @@ export class SoulKVCache {
       const queryVec = await this.embedding.embed(query);
       if (queryVec.length === 0) return await this.snapshot.search(query, project, limit);
 
-      const allSnaps = await this.snapshot.list(project, 9999);
+      const allSnaps = await this.snapshot.list(project, 100);
       const candidates: SemanticCandidate[] = [];
 
       for (const snap of allSnaps) {

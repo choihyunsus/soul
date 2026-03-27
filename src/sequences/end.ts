@@ -115,7 +115,7 @@ export function registerEndSequence(
       // 6. Clear in-memory session
       delete activeSessions[project];
 
-      // 7. Auto-save KV-Cache snapshot (with session chaining)
+      // 7. Auto-save KV-Cache snapshot (with session chaining) + auto-GC
       if (config.KV_CACHE?.enabled && config.KV_CACHE?.autoSaveOnWorkEnd) {
         try {
           const { SoulKVCache } = await import('../lib/kv-cache');
@@ -131,6 +131,13 @@ export function registerEndSequence(
             startedAt: session.startedAt,
             parentSessionId: parentId,
           });
+
+          // Auto-GC: prevent unbounded snapshot growth
+          const maxSnapshots = ((config.KV_CACHE as unknown as Record<string, unknown>)?.maxSnapshotsPerProject as number) || 50;
+          const snapCount = (await kvCache.listSnapshots(project)).length;
+          if (snapCount > maxSnapshots) {
+            await kvCache.gc(project);
+          }
         } catch (e) {
           logError('end:kv-cache', e);
         }

@@ -39,6 +39,8 @@ export const TIERS: Record<string, TierSpec> = {
   COLD: { name: 'cold', maxAgeDays: Infinity },
 };
 
+const MAX_HOT_PER_PROJECT = 20;
+
 /**
  * TierManager wraps a storage engine and adds tiered caching.
  * Hot tier snapshots are kept in memory for fast access.
@@ -75,6 +77,20 @@ export class TierManager {
     const project = session.projectName || 'default';
     if (!this._hotCache[project]) this._hotCache[project] = {};
     this._hotCache[project][id] = { ...session, id } as SessionData;
+
+    // LRU cap: evict oldest entries when exceeding limit
+    const cache = this._hotCache[project];
+    const keys = Object.keys(cache);
+    if (keys.length > MAX_HOT_PER_PROJECT) {
+      const sorted = keys.sort((a, b) => {
+        const ta = new Date(cache[a]?.endedAt || cache[a]?.startedAt || 0).getTime();
+        const tb = new Date(cache[b]?.endedAt || cache[b]?.startedAt || 0).getTime();
+        return ta - tb;
+      });
+      const toRemove = sorted.slice(0, keys.length - MAX_HOT_PER_PROJECT);
+      for (const k of toRemove) delete cache[k];
+    }
+
     return id;
   }
 
@@ -114,7 +130,7 @@ export class TierManager {
     const result = await this.engine.gc(projectName, maxAgeDays, maxCount);
     await this._refreshHotCache(projectName);
 
-    const remaining = await this.list(projectName, 9999);
+    const remaining = await this.list(projectName, 500);
     const counts = { hot: 0, warm: 0, cold: 0 };
     for (const snap of remaining) {
       counts[snap._tier || 'warm']++;
@@ -141,7 +157,7 @@ export class TierManager {
 
   /** Get tier distribution summary for a project */
   async tierSummary(projectName: string): Promise<TierSummary> {
-    const snaps = await this.list(projectName, 9999);
+    const snaps = await this.list(projectName, 500);
     const counts: TierSummary = { hot: 0, warm: 0, cold: 0, total: snaps.length };
     for (const snap of snaps) {
       counts[snap._tier || 'warm']++;

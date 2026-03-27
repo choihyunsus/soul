@@ -248,26 +248,56 @@ export class SqliteStore {
       .sort((a, b) => b._score - a._score);
   }
 
-  /** Garbage collect old snapshots */
+  /** Forgetting Curve GC — retention score determines survival */
   gc(projectName: string, maxAgeDays: number = 30, maxCount: number = 50): GCResult {
     const db = this._getDb(projectName);
 
-    const beforeResult = db.exec('SELECT COUNT(*) FROM snapshots WHERE project_name = ?', [projectName]);
-    const before = (beforeResult.length > 0 && beforeResult[0]?.values?.[0]?.[0]) ? Number(beforeResult[0].values[0][0]) : 0;
+    // Load all snapshots for this project
+    const results = db.exec(
+      'SELECT * FROM snapshots WHERE project_name = ? ORDER BY COALESCE(ended_at, started_at) DESC',
+      [projectName],
+    );
+    if (results.length === 0 || !results[0]) return { deleted: 0 };
 
-    const cutoffDate = new Date(Date.now() - maxAgeDays * 86400000).toISOString();
-    db.run(`DELETE FROM snapshots WHERE project_name = ? AND COALESCE(ended_at, started_at) < ?`, [projectName, cutoffDate]);
-    db.run(`
-      DELETE FROM snapshots WHERE project_name = ? AND id NOT IN (
-        SELECT id FROM snapshots WHERE project_name = ? ORDER BY COALESCE(ended_at, started_at) DESC LIMIT ?
-      )
-    `, [projectName, projectName, maxCount]);
+    const snapshots = results[0].values.map(row => this._resultToSession(results[0]!.columns, row));
+    const cutoff = Date.now() - (maxAgeDays * 24 * 60 * 60 * 1000);
+    let deleted = 0;
+    const survivors: Array<{ snap: SessionData; score: number }> = [];
+    const DECAY_RATE = 0.05;
 
-    const afterResult = db.exec('SELECT COUNT(*) FROM snapshots WHERE project_name = ?', [projectName]);
-    const after = (afterResult.length > 0 && afterResult[0]?.values?.[0]?.[0]) ? Number(afterResult[0].values[0][0]) : 0;
+    for (const snap of snapshots) {
+      const ts = new Date(snap.endedAt || snap.startedAt).getTime();
 
-    this._persist(projectName);
-    return { deleted: before - after };
+      // Hard cutoff: delete if older than maxAgeDays
+      if (ts < cutoff) {
+        db.run('DELETE FROM snapshots WHERE id = ?', [snap.id]);
+        deleted++;
+        continue;
+      }
+
+      // Forgetting Curve retention score
+      const importance = snap.importance ?? 0.5;
+      const accessCount = snap.accessCount || 0;
+      const lastAccessed = snap.lastAccessed || snap.endedAt || snap.startedAt;
+      const ageMs = Date.now() - new Date(lastAccessed).getTime();
+      const ageDays = Math.max(0, ageMs / (1000 * 60 * 60 * 24));
+      const score = Math.min(1.0, importance * (1 + Math.log2(1 + accessCount)) * Math.exp(-DECAY_RATE * ageDays));
+
+      survivors.push({ snap, score });
+    }
+
+    // Enforce maxCount: remove lowest-scored snapshots
+    if (survivors.length > maxCount) {
+      survivors.sort((a, b) => a.score - b.score);
+      const excess = survivors.slice(0, survivors.length - maxCount);
+      for (const { snap } of excess) {
+        db.run('DELETE FROM snapshots WHERE id = ?', [snap.id]);
+        deleted++;
+      }
+    }
+
+    if (deleted > 0) this._persist(projectName);
+    return { deleted };
   }
 
   private _resultToSession(columns: string[], values: SqlJsValue[]): SessionData {
