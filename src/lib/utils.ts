@@ -1,9 +1,10 @@
-// Soul v9.0 — Shared utility functions (file I/O, time, security, logging)
+// Soul v9.0 - Shared utility functions (file I/O, time, security, logging)
 import fs from 'fs';
 import fsp from 'fs/promises';
 import path from 'path';
+import { atomicWrite, atomicWriteAsync } from './durable';
 
-// ── Logging (leveled: debug < info < warn < error) ──
+// -- Logging (leveled: debug < info < warn < error) --
 
 const LOG_LEVELS: Record<string, number> = { debug: 0, info: 1, warn: 2, error: 3 };
 const _logLevel: number = LOG_LEVELS[process.env.N2_LOG_LEVEL || 'info'] ?? LOG_LEVELS['info'] ?? 1;
@@ -22,15 +23,15 @@ export function logInfo(context: string, msg: unknown): void { _log('info', cont
 export function logWarn(context: string, msg: unknown): void { _log('warn', context, msg); }
 export function logError(context: string, err: unknown): void { _log('error', context, err); }
 
-// ── Timezone ──
+// -- Timezone --
 
 let _tz: string | null = null;
 
 function _getTimezone(): string {
   if (!_tz) {
     try {
-      // NOTE: require() kept to avoid circular dependency — config imports utils
-      const config = require('./config') as { TIMEZONE?: string };
+      // NOTE: require() kept to avoid circular dependency - config imports utils
+      const config = (require('./config') as { default: { TIMEZONE?: string } }).default;
       _tz = process.env.N2_TIMEZONE || config.TIMEZONE || 'Asia/Seoul';
     } catch {
       _tz = process.env.N2_TIMEZONE || 'Asia/Seoul';
@@ -39,7 +40,7 @@ function _getTimezone(): string {
   return _tz;
 }
 
-// ── Sync File I/O ──
+// -- Sync File I/O --
 
 export function readFile(filePath: string): string | null {
   try {
@@ -61,21 +62,13 @@ export function readJson<T = unknown>(filePath: string): T | null {
 }
 
 export function writeJson(filePath: string, data: unknown): void {
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  // Atomic write: temp file + rename to prevent corruption on concurrent access
-  const tmpPath = `${filePath}.${process.pid}.tmp`;
-  fs.writeFileSync(tmpPath, JSON.stringify(data, null, 2), 'utf8');
-  fs.renameSync(tmpPath, filePath);
+  atomicWrite(filePath, JSON.stringify(data, null, 2));
 }
-
 export function writeFile(filePath: string, content: string): void {
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  const tmpPath = `${filePath}.${process.pid}.tmp`;
-  fs.writeFileSync(tmpPath, content, 'utf8');
-  fs.renameSync(tmpPath, filePath);
+  atomicWrite(filePath, content);
 }
 
-// ── Async File I/O (for hot-path non-blocking operations) ──
+// -- Async File I/O (for hot-path non-blocking operations) --
 
 export async function readFileAsync(filePath: string): Promise<string | null> {
   try {
@@ -100,22 +93,15 @@ export async function readJsonAsync<T = unknown>(filePath: string): Promise<T | 
 }
 
 export async function writeJsonAsync(filePath: string, data: unknown): Promise<void> {
-  await fsp.mkdir(path.dirname(filePath), { recursive: true });
-  // Atomic write: temp file + rename to prevent corruption on crash
-  const tmpPath = `${filePath}.${process.pid}.tmp`;
-  await fsp.writeFile(tmpPath, JSON.stringify(data, null, 2), 'utf8');
-  await fsp.rename(tmpPath, filePath);
+  await writeFileAsync(filePath, JSON.stringify(data, null, 2));
 }
 
 export async function writeFileAsync(filePath: string, content: string): Promise<void> {
   await fsp.mkdir(path.dirname(filePath), { recursive: true });
-  // Atomic write: temp file + rename to prevent corruption on crash
-  const tmpPath = `${filePath}.${process.pid}.tmp`;
-  await fsp.writeFile(tmpPath, content, 'utf8');
-  await fsp.rename(tmpPath, filePath);
+  await atomicWriteAsync(filePath, content);
 }
 
-// ── Time ──
+// -- Time --
 
 export function today(): string {
   return new Date().toLocaleDateString('sv-SE', { timeZone: _getTimezone() });
@@ -144,7 +130,7 @@ export function nowISO(): string {
   return `${get('year')}-${get('month')}-${get('day')}T${get('hour')}:${get('minute')}:${get('second')}${offset}`;
 }
 
-// ── Security ──
+// -- Security --
 
 export function safePath(filePath: string, baseDir: string): string | null {
   const resolved = path.resolve(baseDir, filePath);
@@ -156,7 +142,7 @@ export function safePath(filePath: string, baseDir: string): string | null {
   return resolved;
 }
 
-// ── First-line comment validation ──
+// -- First-line comment validation --
 
 export function validateFirstLineComment(filePath: string): boolean {
   try {

@@ -1,4 +1,4 @@
-// Soul KV-Cache v9.0 — Context compressor. Reduces documents to key-value pairs.
+// Soul KV-Cache v9.0 - Context compressor. Reduces documents to key-value pairs.
 import { extractKeywords } from './agent-adapter';
 import type { SessionData } from './schema';
 

@@ -1,4 +1,4 @@
-// Soul MCP v9.0 — Entry point. Multi-agent session orchestrator with KV-Cache.
+// Soul MCP v9.0 - Entry point. Multi-agent session orchestrator with KV-Cache.
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
@@ -9,6 +9,7 @@ import { registerBootSequence } from './sequences/boot';
 import { registerWorkSequence, disposeWorkSequence } from './sequences/work';
 import { registerEndSequence } from './sequences/end';
 import { registerBrainTools } from './tools/brain';
+import { registerLearningTools } from './tools/mimir-learning';
 import { registerKVCacheTools } from './tools/kv-cache';
 import type { McpToolServer } from './types';
 import pkg from '../package.json';
@@ -22,6 +23,7 @@ registerWorkSequence(server, z, config, engine);
 registerEndSequence(server, z, config, engine);
 registerBrainTools(server, z, config);
 registerKVCacheTools(server, z, config);
+registerLearningTools(server, z, config);
 
 // Start MCP transport
 async function boot(): Promise<void> {
@@ -35,7 +37,7 @@ boot().catch((err: unknown) => {
   process.exit(1);
 });
 
-// L1: Graceful shutdown — synchronously clean up timers before exit
+// L1: Graceful shutdown - synchronously clean up timers before exit
 function shutdown(): void {
   disposeWorkSequence();
   process.exit(0);

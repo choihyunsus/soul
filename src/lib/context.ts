@@ -1,4 +1,4 @@
-// Soul v9.0 — Session context manager. Replaces global state anti-pattern.
+// Soul v9.0 - Session context manager. Replaces global state anti-pattern.
 
 interface SessionContext {
   agentName: string | null;
@@ -7,7 +7,7 @@ interface SessionContext {
 
 const _ctx: SessionContext = {
   agentName: null,
-  kvChain: {},
+  kvChain: Object.create(null) as Record<string, string>,
 };
 
 /** Get current session context */
@@ -26,13 +26,18 @@ export function getAgentName(): string {
 }
 
 /** Set KV chain parent (for session linking) */
-export function setKvChainParent(project: string, sessionId: string): void {
-  _ctx.kvChain[project] = sessionId;
+export function setKvChainParent(project: string, sessionId: string, agent = getAgentName()): void {
+  _ctx.kvChain[JSON.stringify([project, agent])] = sessionId;
 }
 
 /** Get and consume KV chain parent */
-export function popKvChainParent(project: string): string | null {
-  const parent = _ctx.kvChain[project] || null;
-  delete _ctx.kvChain[project];
+export function popKvChainParent(project: string, agent = getAgentName()): string | null {
+  const parent = _ctx.kvChain[JSON.stringify([project, agent])] || null;
+  delete _ctx.kvChain[JSON.stringify([project, agent])];
   return parent;
+}
+
+/** Read the parent without consuming it; failed saves must remain retryable. */
+export function getKvChainParent(project: string, agent = getAgentName()): string | null {
+  return _ctx.kvChain[JSON.stringify([project, agent])] || null;
 }

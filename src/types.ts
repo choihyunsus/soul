@@ -1,6 +1,6 @@
-// Soul v9.0 — Central type definitions for all modules.
+// Soul v9.0 - Central type definitions for all modules.
 
-// ── Soul Board ──
+// -- Soul Board --
 
 export interface SoulBoard {
   project: string;
@@ -46,9 +46,10 @@ export interface BoardDecision {
   why: string;
 }
 
-// ── MCP Tool Server (lightweight typing for server.tool() API) ──
+// -- MCP Tool Server (lightweight typing for server.tool() API) --
 
 export interface McpToolResult {
+  isError?: boolean;
   content: Array<{ type: string; text: string }>;
 }
 
@@ -57,13 +58,13 @@ export interface McpToolServer {
     name: string,
     description: string,
     schema: Record<string, unknown>,
-    // SDK handler accepts zod-inferred args — exact type varies per tool registration
+    // SDK handler accepts zod-inferred args - exact type varies per tool registration
     handler: (args: never) => Promise<McpToolResult>,
   ): void;
   connect(transport: unknown): Promise<void>;
 }
 
-// ── Ledger ──
+// -- Ledger --
 
 export interface LedgerEntry {
   id: string;
@@ -83,7 +84,7 @@ export interface FileChange {
   desc: string;
 }
 
-// ── Entity Memory ──
+// -- Entity Memory --
 
 export interface EntityRecord {
   type: EntityType;
@@ -95,7 +96,7 @@ export interface EntityRecord {
 
 export type EntityType = 'person' | 'hardware' | 'project' | 'concept' | 'place' | 'service';
 
-// ── Core Memory ──
+// -- Core Memory --
 
 export interface CoreMemoryData {
   agent: string;
@@ -103,7 +104,7 @@ export interface CoreMemoryData {
   entries: Record<string, string>;
 }
 
-// ── KV-Cache ──
+// -- KV-Cache --
 
 export interface KVSnapshot {
   id: string;
@@ -128,7 +129,7 @@ export interface KVContext {
 
 export type SnapshotTier = 'hot' | 'warm' | 'cold';
 
-// ── File Index ──
+// -- File Index --
 
 export interface FileIndex {
   updatedAt: string;
@@ -148,7 +149,7 @@ export interface DirectoryEntry {
   children: Record<string, FileEntry | DirectoryEntry>;
 }
 
-// ── Config ──
+// -- Config --
 
 export interface SoulConfig {
   SOUL_ROOT: string;
@@ -227,7 +228,7 @@ export interface BackupConfig {
 }
 
 
-// ── Claim Result ──
+// -- Claim Result --
 
 export interface ClaimResult {
   ok: boolean;
@@ -235,7 +236,7 @@ export interface ClaimResult {
   intent?: string;
 }
 
-// ── Project Info ──
+// -- Project Info --
 
 export interface ProjectInfo {
   name: string;

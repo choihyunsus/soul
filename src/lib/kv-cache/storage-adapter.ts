@@ -1,4 +1,4 @@
-// Soul KV-Cache v9.0 — StorageAdapter interface. Common contract for all storage backends.
+// Soul KV-Cache v9.0 - StorageAdapter interface. Common contract for all storage backends.
 import type { SessionData, SessionInput } from './schema';
 
 /** Garbage collection result */
@@ -27,7 +27,7 @@ export interface StorageAdapter {
   /** Garbage collect old snapshots based on age and count limits */
   gc(projectName: string, maxAgeDays?: number, maxCount?: number): Promise<GCResult>;
 
-  /** Touch a snapshot — increment access count and update lastAccessed */
+  /** Touch a snapshot - increment access count and update lastAccessed */
   touch(projectName: string, snapshotId: string): Promise<boolean>;
 
   /** Cleanup resources (close DB connections, clear caches) */

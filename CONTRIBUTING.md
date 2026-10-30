@@ -6,7 +6,7 @@ Thank you for your interest in contributing to Soul!
 
 ### Prerequisites
 
-- Node.js 18+
+- Node.js 22 or 24 LTS (runtime minimum: 20.19)
 - Git
 - TypeScript 5.9+
 
@@ -26,7 +26,7 @@ Thank you for your interest in contributing to Soul!
  ```bash
  npm run verify
  ```
- This runs `tsc --noEmit` (type check) + `tsc` (build) + `node --test` (30 tests).
+ This runs type checking, ESLint, a clean build and the regression tests.
 
 ## How to Contribute
 
@@ -147,7 +147,7 @@ npm run lint
 npm run lint:fix
 ```
 
-30 unit tests cover core functionality. When adding new features, include tests.
+Unit and integration tests cover persistence, restart/retry, scope isolation and reviewed learning. When adding new features, include relevant tests. Before release, also run `npm run verify:package` to install and exercise the actual tarball in isolation.
 
 ## Pull Request Guidelines
 
@@ -159,7 +159,7 @@ npm run lint:fix
 
 ## Architecture Principles
 
-- **Deterministic over probabilistic** — Soul forces saves/loads instead of relying on LLM decisions
+- **Explicit persistence** — Soul persists requested saves and restores; host hooks and agent tool calls still need to be configured and verified
 - **Zero config by default** — Everything should work with just `node dist/index.js`
 - **Progressive complexity** — Simple for beginners, powerful for advanced users
 - **Multi-agent first** — Every feature should consider concurrent agent scenarios

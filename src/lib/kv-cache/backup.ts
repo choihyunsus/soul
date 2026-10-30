@@ -1,6 +1,9 @@
-// Soul KV-Cache v9.0 — Backup/Restore engine. sqlite-store compatible DB backup.
+// Soul KV-Cache v9.0 - Backup/Restore engine. sqlite-store compatible DB backup.
 import path from 'path';
+import { memorySegment } from './atomic-json';
 import fs from 'fs';
+import { randomUUID } from 'crypto';
+import { atomicWrite, acquireLock, readStrict } from '../durable';
 import { writeFile, writeJson } from '../utils';
 // SessionData types imported lazily
 
@@ -43,6 +46,7 @@ interface SqlJsResult {
 }
 
 interface BackupConfig {
+  snapshotDir?: string; sqliteDir?: string; backend?: string;
   dir?: string;
   keepCount?: number;
   incremental?: boolean;
@@ -101,12 +105,18 @@ interface BackupOptions {
 /** KV-Cache Backup Manager */
 export class BackupManager {
   private readonly dataDir: string;
+  private readonly snapshotDir: string;
+  private readonly sqliteDir: string;
+  private readonly backend?: string;
   private readonly backupDir: string;
   private readonly keepCount: number;
   private _SQL: SqlJsModule | null;
 
   constructor(dataDir: string, config: BackupConfig = {}) {
     this.dataDir = dataDir;
+    this.snapshotDir = config.snapshotDir || path.join(dataDir, 'kv-cache', 'snapshots');
+    this.sqliteDir = config.sqliteDir || path.join(dataDir, 'kv-cache', 'sqlite');
+    this.backend = config.backend;
     this.backupDir = config.dir || path.join(dataDir, 'kv-cache', 'backups');
     this.keepCount = config.keepCount || 7;
     this._SQL = null;
@@ -121,16 +131,21 @@ export class BackupManager {
 
   /** Backup all project data into a sqlite-store compatible DB */
   async backup(project: string, options: BackupOptions = {}): Promise<BackupResult> {
-    const projectBackupDir = path.join(this.backupDir, project);
+    const release = acquireLock(path.join(this.backupDir, memorySegment(project), 'backup.lock'));
+    try { return await this._backupProject(project, options); } finally { release(); }
+  }
+
+  private async _backupProject(project: string, options: BackupOptions): Promise<BackupResult> {
+    const projectBackupDir = path.join(this.backupDir, memorySegment(project));
     if (!fs.existsSync(projectBackupDir)) fs.mkdirSync(projectBackupDir, { recursive: true });
 
     const manifest = this._loadManifest(project);
-    const sqlitePath = path.join(this.dataDir, 'kv-cache', 'sqlite', `${project}.sqlite`);
+    const sqlitePath = path.join(this.sqliteDir, `${memorySegment(project)}.sqlite`);
 
-    if (fs.existsSync(sqlitePath)) {
+    if (this.backend !== 'json' && fs.existsSync(sqlitePath)) {
       return this._backupByCopy(project, sqlitePath, manifest, options);
     }
-    return this._backupFromJson(project, manifest, options);
+    return await this._backupFromJson(project, manifest, options);
   }
 
   private _backupByCopy(
@@ -145,8 +160,8 @@ export class BackupManager {
     }
 
     const backupId = this._makeBackupId();
-    const destPath = path.join(this.backupDir, project, `backup-${backupId}.sqlite`);
-    fs.copyFileSync(sqlitePath, destPath);
+    const destPath = path.join(this.backupDir, memorySegment(project), `backup-${memorySegment(backupId)}.sqlite`);
+    atomicWrite(destPath, fs.readFileSync(sqlitePath));
     const stat = fs.statSync(destPath);
 
     const entry: ManifestEntry = {
@@ -167,7 +182,7 @@ export class BackupManager {
     project: string, manifest: Manifest, options: BackupOptions,
   ): Promise<BackupResult> {
     const SQL = await this._initSql();
-    const snapDir = path.join(this.dataDir, 'kv-cache', 'snapshots', project);
+    const snapDir = path.join(this.snapshotDir, memorySegment(project));
     if (!fs.existsSync(snapDir)) {
       return { backupId: null, snapshots: 0, sizeBytes: 0, type: 'empty', error: 'No snapshots' };
     }
@@ -193,10 +208,10 @@ export class BackupManager {
     const embCount = this._insertEmbeddingsIntoDb(db, project);
 
     const backupId = this._makeBackupId();
-    const destPath = path.join(this.backupDir, project, `backup-${backupId}.sqlite`);
+    const destPath = path.join(this.backupDir, memorySegment(project), `backup-${memorySegment(backupId)}.sqlite`);
     const dbData = db.export();
     const buffer = Buffer.from(dbData);
-    fs.writeFileSync(destPath, buffer);
+    atomicWrite(destPath, buffer);
     db.close();
 
     const entry: ManifestEntry = {
@@ -235,7 +250,7 @@ export class BackupManager {
         id TEXT PRIMARY KEY, agent_name TEXT NOT NULL, agent_type TEXT DEFAULT 'external',
         model TEXT, started_at TEXT, ended_at TEXT, turn_count INTEGER DEFAULT 0,
         token_estimate INTEGER DEFAULT 0, keys TEXT DEFAULT '[]', context TEXT DEFAULT '{}',
-        parent_session_id TEXT, project_name TEXT NOT NULL,
+        parent_session_id TEXT, project_name TEXT NOT NULL, raw_json TEXT, metadata TEXT DEFAULT '{}',
         created_at TEXT DEFAULT (datetime('now'))
       )
     `);
@@ -248,8 +263,8 @@ export class BackupManager {
     const stmt = db.prepare(`
       INSERT OR REPLACE INTO snapshots
       (id, agent_name, agent_type, model, started_at, ended_at,
-       turn_count, token_estimate, keys, context, parent_session_id, project_name)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       turn_count, token_estimate, keys, context, parent_session_id, project_name, raw_json, metadata)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     let count = 0;
     try {
@@ -262,7 +277,7 @@ export class BackupManager {
             s.model ?? null, s.startedAt ?? null,
             s.endedAt ?? null, s.turnCount ?? 0, s.tokenEstimate ?? 0,
             JSON.stringify(s.keys ?? []), JSON.stringify(s.context ?? {}),
-            s.parentSessionId ?? null, s.projectName ?? project,
+            s.parentSessionId ?? null, s.projectName ?? project, raw, raw,
           ]);
           count++;
         } catch { /* skip corrupt */ }
@@ -273,7 +288,7 @@ export class BackupManager {
 
   /** Insert embeddings into backup DB */
   private _insertEmbeddingsIntoDb(db: SqlJsDatabase, project: string): number {
-    const embDir = path.join(this.dataDir, 'kv-cache', 'embeddings', project);
+    const embDir = path.join(this.dataDir, 'kv-cache', 'embeddings', memorySegment(project));
     if (!fs.existsSync(embDir)) return 0;
     let count = 0;
     const stmt = db.prepare('INSERT OR REPLACE INTO embeddings (snapshot_id, vector) VALUES (?, ?)');
@@ -297,13 +312,14 @@ export class BackupManager {
       backupId = manifest.backups[manifest.backups.length - 1]?.id ?? '';
     }
 
-    const dbPath = path.join(this.backupDir, project, `backup-${backupId}.sqlite`);
+    const dbPath = path.join(this.backupDir, memorySegment(project), `backup-${memorySegment(backupId)}.sqlite`);
     if (!fs.existsSync(dbPath)) return { error: `Backup not found: ${backupId}`, restored: 0 };
 
     if ((options.target || 'json') === 'sqlite') {
-      const destDir = path.join(this.dataDir, 'kv-cache', 'sqlite');
+      const destDir = this.sqliteDir;
       if (!fs.existsSync(destDir)) fs.mkdirSync(destDir, { recursive: true });
-      fs.copyFileSync(dbPath, path.join(destDir, `${project}.sqlite`));
+      const release = acquireLock(path.join(destDir, memorySegment(project) + '.lock'));
+      try { atomicWrite(path.join(destDir, `${memorySegment(project)}.sqlite`), fs.readFileSync(dbPath)); } finally { release(); }
       return { restored: 'full', backupId, target: 'sqlite' };
     }
 
@@ -320,7 +336,7 @@ export class BackupManager {
 
   /** Restore snapshots from backup DB to JSON files */
   private _restoreSnapshots(db: SqlJsDatabase, project: string): number {
-    const snapDir = path.join(this.dataDir, 'kv-cache', 'snapshots', project);
+    const snapDir = path.join(this.snapshotDir, memorySegment(project));
     if (!fs.existsSync(snapDir)) fs.mkdirSync(snapDir, { recursive: true });
 
     let count = 0;
@@ -330,7 +346,8 @@ export class BackupManager {
       for (const row of snapRows[0].values) {
         const obj: Record<string, string | number | null | Uint8Array> = {};
         cols.forEach((c, i) => { obj[c] = row[i] ?? null; });
-        const session = {
+        const session = obj.raw_json ? JSON.parse(String(obj.raw_json)) as Record<string, unknown> : {
+          ...JSON.parse(String(obj.metadata || '{}')) as Record<string, unknown>,
           id: obj.id, agentName: obj.agent_name, agentType: obj.agent_type,
           model: obj.model, startedAt: obj.started_at, endedAt: obj.ended_at,
           turnCount: obj.turn_count, tokenEstimate: obj.token_estimate,
@@ -338,10 +355,10 @@ export class BackupManager {
           context: JSON.parse(String(obj.context ?? '{}')) as Record<string, unknown>,
           parentSessionId: obj.parent_session_id, projectName: obj.project_name,
         };
-        const dateStr = (String(session.endedAt || session.startedAt || '')).split('T')[0] || '1970-01-01';
-        const dateDir = path.join(snapDir, dateStr);
+        const dateStr = (typeof session.endedAt === 'string' ? session.endedAt : typeof session.startedAt === 'string' ? session.startedAt : '').split('T')[0] || '1970-01-01';
+        const dateDir = path.join(snapDir, memorySegment(dateStr));
         if (!fs.existsSync(dateDir)) fs.mkdirSync(dateDir, { recursive: true });
-        writeFile(path.join(dateDir, `${String(session.id)}.json`), JSON.stringify(session, null, 2));
+        writeFile(path.join(dateDir, `${memorySegment(String(session.id))}.json`), JSON.stringify(session, null, 2));
         count++;
       }
     }
@@ -350,13 +367,13 @@ export class BackupManager {
 
   /** Restore embeddings from backup DB to JSON files */
   private _restoreEmbeddings(db: SqlJsDatabase, project: string): number {
-    const embDir = path.join(this.dataDir, 'kv-cache', 'embeddings', project);
+    const embDir = path.join(this.dataDir, 'kv-cache', 'embeddings', memorySegment(project));
     if (!fs.existsSync(embDir)) fs.mkdirSync(embDir, { recursive: true });
     let count = 0;
     const embRows = db.exec('SELECT snapshot_id, vector FROM embeddings');
     if (embRows.length > 0 && embRows[0]) {
       for (const row of embRows[0].values) {
-        writeFile(path.join(embDir, `${String(row[0])}.json`), String(row[1]));
+        writeFile(path.join(embDir, `${memorySegment(String(row[0]))}.json`), String(row[1]));
         count++;
       }
     }
@@ -381,16 +398,16 @@ export class BackupManager {
     };
   }
 
-  // ── Helpers ──
+  // -- Helpers --
 
   private _cleanup(project: string): { deleted: number } {
     const manifest = this._loadManifest(project);
-    const dir = path.join(this.backupDir, project);
+    const dir = path.join(this.backupDir, memorySegment(project));
     let deleted = 0;
     while (manifest.backups.length > this.keepCount) {
       const old = manifest.backups.shift();
       if (old) {
-        try { fs.unlinkSync(path.join(dir, `backup-${old.id}.sqlite`)); deleted++; } catch { /* */ }
+        try { fs.unlinkSync(path.join(dir, `backup-${memorySegment(old.id)}.sqlite`)); deleted++; } catch { /* */ }
       }
     }
     if (deleted > 0) this._saveManifest(project, manifest);
@@ -399,19 +416,16 @@ export class BackupManager {
 
   private _makeBackupId(): string {
     const iso = new Date().toISOString();
-    return iso.slice(0, 10) + '_' + iso.slice(11, 19).replace(/:/g, '');
+    return iso.slice(0, 10) + '_' + randomUUID();
   }
 
   private _loadManifest(project: string): Manifest {
-    const p = path.join(this.backupDir, project, 'manifest.json');
-    try {
-      if (fs.existsSync(p)) return JSON.parse(fs.readFileSync(p, 'utf-8')) as Manifest;
-    } catch { /* */ }
-    return { backups: [], lastBackup: null };
+    const p = path.join(this.backupDir, memorySegment(project), 'manifest.json');
+    return readStrict<Manifest>(p) ?? { backups: [], lastBackup: null };
   }
 
   private _saveManifest(project: string, manifest: Manifest): void {
-    const dir = path.join(this.backupDir, project);
+    const dir = path.join(this.backupDir, memorySegment(project));
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     writeJson(path.join(dir, 'manifest.json'), manifest);
   }

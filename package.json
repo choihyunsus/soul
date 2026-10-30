@@ -1,6 +1,6 @@
 {
     "name": "n2-soul",
-    "version": "9.0.9",
+    "version": "9.2.0",
     "description": "AI agent memory & session orchestrator for MCP — persistent KV-Cache, Soul Board, immutable Ledger",
     "main": "dist/index.js",
     "types": "dist/index.d.ts",
@@ -8,18 +8,23 @@
         "dist/**/*.js",
         "dist/**/*.d.ts",
         "!dist/tests/**",
-        "!dist/**/*.test.*"
+        "!dist/**/*.test.*",
+        "README.ko.md",
+        "CHANGELOG.md",
+        "!dist/**/config.local.*",
+        "LICENSE-APACHE"
     ],
     "scripts": {
-        "build": "tsc",
+        "build": "node scripts/build.cjs",
         "start": "node dist/index.js",
         "dev": "tsc --watch",
         "typecheck": "tsc --noEmit",
         "lint": "eslint src/ --max-warnings=0",
         "lint:fix": "eslint src/ --fix --max-warnings=0",
-        "test": "node --test dist/tests/*.test.js",
+        "test": "node --test dist/tests/*.test.js tests/*.test.cjs",
         "verify": "npm run typecheck && npm run lint && npm run build && npm run test",
-        "prepublishOnly": "npm run lint && npm run build && npm run test"
+        "prepublishOnly": "npm run verify && npm run verify:package",
+        "verify:package": "node scripts/verify-package.cjs"
     },
     "keywords": [
         "mcp",
@@ -47,14 +52,14 @@
         "url": "https://github.com/choihyunsus/soul/issues"
     },
     "engines": {
-        "node": ">=18.0.0"
+        "node": ">=20.19.0"
     },
     "dependencies": {
-        "@modelcontextprotocol/sdk": "^1.25.2",
+        "@modelcontextprotocol/sdk": "^1.32.2",
         "better-sqlite3": "^11.10.0",
         "sql.js": "~1.11.0",
         "sqlite-vec": "^0.1.7",
-        "zod": "~3.24.1"
+        "zod": "^4.6.7"
     },
     "devDependencies": {
         "@eslint/js": "^10.0.1",

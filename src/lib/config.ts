@@ -1,4 +1,4 @@
-// Soul v9.0 — Config loader. Deep-merges config.default with config.local overrides.
+// Soul v9.0 - Config loader. Deep-merges config.default with config.local overrides.
 import type { SoulConfig } from '../types';
 import defaults from './config.default';
 
@@ -8,7 +8,7 @@ type DeepPartial<T> = {
 
 let local: DeepPartial<SoulConfig> = {};
 try {
-  // NOTE: require() intentionally kept — config.local.js is a runtime-optional CJS file
+  // NOTE: require() intentionally kept - config.local.js is a runtime-optional CJS file
   // that may or may not exist. Static import cannot handle optional modules gracefully.
   const rawConf: unknown = require('./config.local.js');
   local = (typeof rawConf === 'object' && rawConf !== null ? rawConf : {}) as DeepPartial<SoulConfig>;
@@ -47,7 +47,7 @@ const config: SoulConfig = deepMerge(
   local as DeepPartial<IndexedConfig>,
 );
 
-// M3: Basic config validation — catch malformed config.local.js early
+// M3: Basic config validation - catch malformed config.local.js early
 if (!config.DATA_DIR || typeof config.DATA_DIR !== 'string') {
   throw new Error('[soul:config] FATAL: DATA_DIR is missing or invalid. Check config.default.ts or config.local.js');
 }

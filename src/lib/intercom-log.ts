@@ -1,11 +1,11 @@
-// Soul v9.0 — Centralized conversation log writer for inter-agent communication.
+// Soul v9.0 - Centralized conversation log writer for inter-agent communication.
 import fs from 'fs';
 import path from 'path';
 import { detectAgentsDir } from './agent-registry';
 import { writeJson, readJson, nowISO, logError } from './utils';
 import type { SoulConfig } from '../types';
 
-// ── Types ──
+// -- Types --
 
 interface ConversationEntry {
   timestamp: string;
@@ -33,7 +33,7 @@ interface TargetConfig {
   name?: string;
 }
 
-// ── Agent name whitelist (lazy-loaded from agent configs) ──
+// -- Agent name whitelist (lazy-loaded from agent configs) --
 
 let _validNames: Set<string> | null = null;
 
@@ -71,7 +71,7 @@ export function normalizeName(name: string | null | undefined): string {
   return 'master';
 }
 
-// ── Path helpers ──
+// -- Path helpers --
 
 function getConversationsDir(config: Partial<SoulConfig> | null): string {
   const dataDir = config?.DATA_DIR || path.join(__dirname, '..', '..', 'data');
@@ -97,7 +97,7 @@ export function getNextLogId(dir: string): string {
   return String(max + 1).padStart(3, '0');
 }
 
-// ── Core write function ──
+// -- Core write function --
 
 /** Write a conversation log entry for both caller and target */
 export function writeConversationLog(
@@ -144,7 +144,7 @@ export function writeConversationLog(
   return { callerLog: `${safeCaller}/${callerId}`, targetLog: `${safeTarget}/${targetId}` };
 }
 
-// ── Read functions ──
+// -- Read functions --
 
 /** Read conversation logs for an agent on a specific date */
 export function readConversationLogs(

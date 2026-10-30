@@ -30,7 +30,7 @@ describe('PerfMonitor', () => {
     pm.record(10); // pushes out 100
     const snap = pm.getSnapshot();
     assert.equal(snap.sampleCount, 3);
-    // [200, 300, 10] → avg = 170
+    // [200, 300, 10] -> avg = 170
     assert.ok(Math.abs(snap.avgLatencyMs - 170) < 1);
   });
 

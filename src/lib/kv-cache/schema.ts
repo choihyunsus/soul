@@ -1,8 +1,8 @@
-// Soul KV-Cache v9.0 — Universal agent session schema. Model-agnostic, distribution-ready.
+// Soul KV-Cache v9.0 - Universal agent session schema. Model-agnostic, distribution-ready.
 import crypto from 'crypto';
 import type { SnapshotTier } from '../../types';
 
-/** Schema version — increment on breaking changes to session structure. */
+/** Schema version - increment on breaking changes to session structure. */
 export const SCHEMA_VERSION = 2;
 
 export type AgentType = 'mcp' | 'browser' | 'external';
@@ -15,6 +15,7 @@ export interface SessionContext {
 }
 
 export interface SessionData {
+  source?: Record<string, unknown>;
   schemaVersion: number;
   id: string;
   agentName: string;
@@ -35,6 +36,7 @@ export interface SessionData {
 }
 
 export interface SessionInput {
+  source?: Record<string, unknown>;
   id?: string;
   agentName?: string;
   agentType?: string;
@@ -57,6 +59,7 @@ export interface SessionInput {
 export function createSession(input: SessionInput = {}): SessionData {
   const now = new Date().toISOString();
   return {
+    ...(input.source ? { source: input.source } : {}),
     schemaVersion: SCHEMA_VERSION,
     id: input.id || crypto.randomUUID(),
     agentName: input.agentName || 'unknown',

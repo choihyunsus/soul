@@ -1,21 +1,12 @@
-// Soul MCP v9.0 — Work sequence. Real-time change tracking, file ownership, context search.
+// Soul MCP v9.0 - Work sequence. Real-time change tracking, file ownership, context search.
 import fs from 'fs';
+import { WorkStore } from '../lib/work-store';
+import { canonicalAgent } from '../lib/continuity';
 import path from 'path';
 import type { z as ZodType } from 'zod';
-import { nowISO, readJson, readFile, validateFirstLineComment, logError } from '../lib/utils';
+import { readJson, readFile, validateFirstLineComment, logError } from '../lib/utils';
 import type { SoulEngine } from '../lib/soul-engine';
 import type { McpToolServer, SoulConfig, FileChange } from '../types';
-
-interface WorkSession {
-  agent: string;
-  task: string;
-  startedAt: string;
-  _createdMs: number;
-  filesCreated: FileChange[];
-  filesModified: FileChange[];
-  filesDeleted: FileChange[];
-  decisions: string[];
-}
 
 interface SearchResultItem {
   source: string;
@@ -28,24 +19,10 @@ interface SearchResultItem {
   title?: string;
 }
 
-// In-memory work session state per project
-export const activeSessions: Record<string, WorkSession> = {};
+// Work records survive process restarts; retained for old callers that dispose timers.
+export function disposeWorkSequence(): void {}
 
-// TTL: auto-expire stale sessions — initialized lazily in registerWorkSequence
-let _sessionGcTimer: ReturnType<typeof setInterval> | null = null;
-
-const MS_PER_HOUR = 60 * 60 * 1000;
-const SESSION_GC_INTERVAL_MS = MS_PER_HOUR;
-
-/** Cleanup GC timer — call in tests or before shutdown */
-export function disposeWorkSequence(): void {
-  if (_sessionGcTimer) {
-    clearInterval(_sessionGcTimer);
-    _sessionGcTimer = null;
-  }
-}
-
-// ── Helper: recursively walk files (with cap to prevent event loop blocking) ──
+// -- Helper: recursively walk files (with cap to prevent event loop blocking) --
 function walkFiles(dir: string, callback: (filePath: string) => void, maxDepth: number, depth: number = 0, counter?: { n: number; max: number }): void {
   const c = counter ?? { n: 0, max: 200 };
   if (depth > maxDepth || c.n >= c.max) return;
@@ -68,6 +45,7 @@ function walkFiles(dir: string, callback: (filePath: string) => void, maxDepth: 
 interface WorkStartInput { agent: string; project: string; task: string }
 interface WorkClaimInput { project: string; agent: string; filePath: string; intent: string }
 interface WorkLogInput {
+  agent?: string; sessionId?: string;
   project: string;
   filesCreated?: FileChange[];
   filesModified?: FileChange[];
@@ -181,31 +159,19 @@ export function registerWorkSequence(
   config: SoulConfig,
   engine: SoulEngine,
 ): void {
-  _initSessionGc(config);
-  _registerWorkStartTool(server, z, engine);
-  _registerWorkClaimTool(server, z, engine);
-  _registerWorkLogTool(server, z);
+  const store = new WorkStore(config.DATA_DIR);
+  server.tool('n2_work_sessions', 'List unfinished work and completed work with pending Mimir collection; use the exact sessionId to resume.',
+    { project: z.string().optional() }, async ({ project }: { project?: string }) => ({
+      content: [{ type: 'text', text: JSON.stringify(store.pending(project).map(r => ({ sessionId: r.id, project: r.project, agent: r.agent, task: r.task, startedAt: r.startedAt, ending: !!r.ending, completed: !!r.completed, learningStatus: r.learningStatus }))) }],
+    }));
+  _registerWorkStartTool(server, z, engine, store);
+  _registerWorkClaimTool(server, z, engine, store);
+  _registerWorkLogTool(server, z, store);
   _registerContextSearchTool(server, z, config);
 }
 
-/** Initialize session TTL garbage collector */
-function _initSessionGc(config: SoulConfig): void {
-  if (_sessionGcTimer) return;
-  const sessionTtlMs = (config.WORK?.sessionTtlHours ?? 24) * MS_PER_HOUR;
-  _sessionGcTimer = setInterval(() => {
-    const now = Date.now();
-    for (const [project, session] of Object.entries(activeSessions)) {
-      if (session._createdMs && (now - session._createdMs) > sessionTtlMs) {
-        delete activeSessions[project];
-        logError('work:ttl', `Expired stale session: ${project} (agent: ${session.agent})`);
-      }
-    }
-  }, SESSION_GC_INTERVAL_MS);
-  _sessionGcTimer.unref();
-}
-
 /** Register n2_work_start tool */
-function _registerWorkStartTool(server: McpToolServer, z: typeof ZodType, engine: SoulEngine): void {
+function _registerWorkStartTool(server: McpToolServer, z: typeof ZodType, engine: SoulEngine, store: WorkStore): void {
   server.tool(
     'n2_work_start',
     'Start a work sequence. Registers agent in activeWork on soul-board.',
@@ -215,18 +181,19 @@ function _registerWorkStartTool(server: McpToolServer, z: typeof ZodType, engine
       task: z.string().describe('Task description'),
     },
     async ({ agent, project, task }: WorkStartInput) => {
-      engine.setActiveWork(project, agent, task, []);
-      activeSessions[project] = {
-        agent, task, startedAt: nowISO(), _createdMs: Date.now(),
-        filesCreated: [], filesModified: [], filesDeleted: [], decisions: [],
-      };
-      return { content: [{ type: 'text', text: `Work started: ${agent} on ${project} — ${task}` }] };
+      agent = canonicalAgent(agent);
+      const release = store.lock(project);
+      try {
+        engine.setActiveWork(project, agent, task, []);
+        const record = store.start(project, agent, task);
+        return { content: [{ type: 'text', text: `Work started: ${agent} on ${project} — ${task}\nsessionId: ${record.id} (use for work_log and work_end)` }] };
+      } finally { release(); }
     },
   );
 }
 
 /** Register n2_work_claim tool */
-function _registerWorkClaimTool(server: McpToolServer, z: typeof ZodType, engine: SoulEngine): void {
+function _registerWorkClaimTool(server: McpToolServer, z: typeof ZodType, engine: SoulEngine, store: WorkStore): void {
   server.tool(
     'n2_work_claim',
     'Claim file ownership before modifying. Prevents collision with other agents.',
@@ -237,7 +204,10 @@ function _registerWorkClaimTool(server: McpToolServer, z: typeof ZodType, engine
       intent: z.string().describe('Why you are modifying this file'),
     },
     async ({ project, agent, filePath, intent }: WorkClaimInput) => {
-      const result = engine.claimFile(project, filePath, agent, intent);
+      const release = store.lock(project);
+      let result;
+      try { result = engine.claimFile(project, filePath, canonicalAgent(agent), intent); }
+      finally { release(); }
       if (!result.ok) {
         return { content: [{ type: 'text', text: `COLLISION: ${filePath} is owned by ${result.owner ?? '?'} (${result.intent ?? '?'}). Choose a different file.` }] };
       }
@@ -247,27 +217,30 @@ function _registerWorkClaimTool(server: McpToolServer, z: typeof ZodType, engine
 }
 
 /** Register n2_work_log tool */
-function _registerWorkLogTool(server: McpToolServer, z: typeof ZodType): void {
+function _registerWorkLogTool(server: McpToolServer, z: typeof ZodType, store: WorkStore): void {
   server.tool(
     'n2_work_log',
     'Log file changes during work. Reports created/modified/deleted files with descriptions.',
     {
       project: z.string().describe('Project name'),
+      agent: z.string().optional(),
+      sessionId: z.string().optional(),
       filesCreated: z.array(z.object({ path: z.string(), desc: z.string() })).optional().describe('Files created'),
       filesModified: z.array(z.object({ path: z.string(), desc: z.string() })).optional().describe('Files modified'),
       filesDeleted: z.array(z.object({ path: z.string(), desc: z.string() })).optional().describe('Files deleted'),
       decisions: z.array(z.string()).optional().describe('Decisions made'),
     },
-    async ({ project, filesCreated, filesModified, filesDeleted, decisions }: WorkLogInput) => {
-      const session = activeSessions[project];
-      if (!session) {
-        return { content: [{ type: 'text', text: 'WARNING: No active work session. Logging skipped. Call n2_work_start for tracking.' }] };
-      }
+    async ({ project, agent, sessionId, filesCreated, filesModified, filesDeleted, decisions }: WorkLogInput) => {
+      const release = store.lock(project);
+      try {
+      const session = store.resolve(project, agent, sessionId);
+      if (session.completed || session.ending) throw new Error('Work is ending or completed; log cannot be changed');
       if (filesCreated) session.filesCreated.push(...filesCreated);
       if (filesModified) session.filesModified.push(...filesModified);
       if (filesDeleted) session.filesDeleted.push(...filesDeleted);
       if (decisions) session.decisions.push(...decisions);
 
+      store.save(session);
       const warnings: string[] = [];
       for (const f of (filesCreated ?? [])) {
         try {
@@ -280,10 +253,11 @@ function _registerWorkLogTool(server: McpToolServer, z: typeof ZodType): void {
       let msg = `Logged: ${total} file changes, ${session.decisions.length} decisions.`;
       if (warnings.length > 0) msg += `\nWARNINGS:\n  ${warnings.join('\n  ')}`;
       if ((filesCreated && filesCreated.length > 0) || (filesDeleted && filesDeleted.length > 0)) {
-        msg += `\nFile tree will auto-update at n2_work_end. Use n2_project_scan for immediate refresh.`;
+        msg += `\nUse n2_project_scan with the intended project root to refresh its file tree.`;
       }
-      msg += `\nTODO RULE: All TODO files go in _data/ ONLY. Always mark completed items as [x]. Never use brain memory for TODOs.`;
+
       return { content: [{ type: 'text', text: msg }] };
+      } finally { release(); }
     },
   );
 }

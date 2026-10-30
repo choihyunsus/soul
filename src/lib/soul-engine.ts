@@ -1,5 +1,7 @@
-// Soul v9.0 — Soul engine: Board, Ledger, and File Index management.
+// Soul v9.0 - Soul engine: Board, Ledger, and File Index management.
 import fs from 'fs';
+import { memorySegment } from './kv-cache/atomic-json';
+import { readStrict } from './durable';
 import path from 'path';
 import { readJson, writeJson, nowISO, logError } from './utils';
 import type {
@@ -14,6 +16,7 @@ interface BoardCacheEntry {
 }
 
 interface LedgerInputEntry {
+  operationId?: string;
   startedAt?: string;
   title?: string;
   filesCreated?: FileChange[];
@@ -37,10 +40,10 @@ export class SoulEngine {
     this._boardCache = new Map();
   }
 
-  // ── Path helpers ──
+  // -- Path helpers --
 
   projectDir(projectName: string): string {
-    return path.join(this.dataDir, 'projects', projectName);
+    return path.join(this.dataDir, 'projects', memorySegment(projectName));
   }
 
   boardPath(projectName: string): string {
@@ -59,24 +62,12 @@ export class SoulEngine {
     return path.join(this.projectDir(projectName), 'ledger', y, m, d);
   }
 
-  // ── Soul Board (with in-memory cache) ──
+  // -- Soul Board (with in-memory cache) --
 
   readBoard(projectName: string): SoulBoard {
     const filePath = this.boardPath(projectName);
-    const cached = this._boardCache.get(projectName);
-
-    // Check if file was modified externally (multi-agent safety)
-    try {
-      const stat = fs.statSync(filePath);
-      const diskMtime = stat.mtimeMs;
-      if (cached && cached.mtime >= diskMtime) {
-        return cached.board;
-      }
-    } catch {
-      // File doesn't exist yet — return default
-    }
-
-    const board = readJson<SoulBoard>(filePath) || this._defaultBoard(projectName);
+    const board = readStrict<SoulBoard>(filePath) || this._defaultBoard(projectName);
+    if (board.project !== projectName) throw new Error('Board project identity mismatch; original preserved');
     this._boardCache.set(projectName, { board, mtime: Date.now() });
     return board;
   }
@@ -101,7 +92,7 @@ export class SoulEngine {
     };
   }
 
-  // ── File Ownership ──
+  // -- File Ownership --
 
   claimFile(
     projectName: string, filePath: string, agent: string, intent: string,
@@ -128,7 +119,7 @@ export class SoulEngine {
     this.writeBoard(projectName, board);
   }
 
-  // ── Active Work ──
+  // -- Active Work --
 
   setActiveWork(
     projectName: string, agent: string, task: string, files?: string[],
@@ -148,7 +139,7 @@ export class SoulEngine {
     this.writeBoard(projectName, board);
   }
 
-  // ── Ledger ──
+  // -- Ledger --
 
   getNextLedgerId(projectName: string, date?: string): string {
     const dir = this.ledgerDir(projectName, date);
@@ -162,8 +153,8 @@ export class SoulEngine {
   writeLedger(
     projectName: string, agent: string, entry: LedgerInputEntry,
   ): { id: string; path: string } {
-    const date = nowISO().split('T')[0] ?? '';
-    const id = this.getNextLedgerId(projectName, date);
+    const date = (entry.operationId ? entry.startedAt || nowISO() : nowISO()).split('T')[0] ?? '';
+    const id = entry.operationId ? memorySegment(entry.operationId) : this.getNextLedgerId(projectName, date);
     const ledgerEntry: LedgerEntry = {
       id,
       agent,
@@ -179,7 +170,8 @@ export class SoulEngine {
 
     const dir = this.ledgerDir(projectName, date);
     const fileName = `${id}-${agent.toLowerCase().replace(/[^a-z0-9]/g, '')}.json`;
-    writeJson(path.join(dir, fileName), ledgerEntry);
+    const prior = readStrict<LedgerEntry>(path.join(dir, fileName));
+    if (!prior) writeJson(path.join(dir, fileName), ledgerEntry);
 
     // Update board's lastLedger reference
     const dateParts = date.split('-');
@@ -194,7 +186,7 @@ export class SoulEngine {
     return { id, path: path.join(dir, fileName) };
   }
 
-  // ── Ledger Pruning ──
+  // -- Ledger Pruning --
 
   /** Remove ledger entries older than maxAgeDays */
   pruneLedger(projectName: string, maxAgeDays: number = 90): number {
@@ -239,7 +231,7 @@ export class SoulEngine {
     return deleted;
   }
 
-  // ── All Projects (sorted by recency) ──
+  // -- All Projects (sorted by recency) --
 
   listAllProjects(): ProjectInfo[] {
     const projectsDir = path.join(this.dataDir, 'projects');
@@ -259,7 +251,7 @@ export class SoulEngine {
     }
   }
 
-  // ── File Index ──
+  // -- File Index --
 
   readFileIndex(projectName: string): FileIndex {
     return readJson<FileIndex>(this.fileIndexPath(projectName)) ||

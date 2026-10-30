@@ -1,5 +1,7 @@
-// Soul KV-Cache v9.0 — SQLite storage engine (pure JS via sql.js). No native deps.
+// Soul KV-Cache v9.0 - SQLite storage engine (pure JS via sql.js). No native deps.
 import fs from 'fs';
+import { memorySegment } from './atomic-json';
+import { acquireLock, atomicWrite } from '../durable';
 import path from 'path';
 import { createSession } from './schema';
 import type { SessionData, SessionInput, SessionContext } from './schema';
@@ -69,7 +71,7 @@ export class SqliteStore implements StorageAdapter {
 
   constructor(baseDir: string) {
     this.baseDir = baseDir;
-    this._dbs = {};
+    this._dbs = Object.create(null) as Record<string, DbEntry>;
     this._ready = false;
   }
 
@@ -87,8 +89,9 @@ export class SqliteStore implements StorageAdapter {
   }
 
   private _getDb(projectName: string): SqlJsDatabase {
+    memorySegment(projectName);
     const existing = this._dbs[projectName];
-    if (existing) return existing.db;
+    if (existing) { existing.db.close(); delete this._dbs[projectName]; }
 
     this._assertReady();
     const dbPath = path.join(this.baseDir, `${projectName}.sqlite`);
@@ -103,8 +106,7 @@ export class SqliteStore implements StorageAdapter {
       db = new _SQL.Database();
     }
 
-    if (projectName === '_tool-catalog') this._initToolCatalogSchema(db);
-    else this._initSnapshotSchema(db);
+    this._initSnapshotSchema(db);
 
     this._dbs[projectName] = { db, dirty: false, path: dbPath };
     return db;
@@ -121,30 +123,16 @@ export class SqliteStore implements StorageAdapter {
         created_at TEXT DEFAULT (datetime('now'))
       )
     `);
+    const columns = db.exec('PRAGMA table_info(snapshots)')[0]?.values ?? [];
+    if (!columns.some(row => row[1] === 'metadata')) db.run("ALTER TABLE snapshots ADD COLUMN metadata TEXT DEFAULT '{}'");
     db.run(`CREATE INDEX IF NOT EXISTS idx_snapshots_project ON snapshots(project_name, ended_at DESC)`);
-  }
-
-  /** Initialize tool catalog schema */
-  private _initToolCatalogSchema(db: SqlJsDatabase): void {
-    db.run(`
-      CREATE TABLE IF NOT EXISTS tools (
-        name TEXT PRIMARY KEY, description TEXT DEFAULT '', source TEXT DEFAULT 'unknown',
-        category TEXT DEFAULT 'misc', plugin_name TEXT DEFAULT '',
-        input_schema TEXT DEFAULT '{}', triggers TEXT DEFAULT '[]', tags TEXT DEFAULT '[]',
-        search_text TEXT DEFAULT '', embedding TEXT DEFAULT '',
-        usage_count INTEGER DEFAULT 0, success_rate REAL DEFAULT 1.0,
-        registered_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now'))
-      )
-    `);
-    db.run(`CREATE INDEX IF NOT EXISTS idx_tools_source ON tools(source)`);
-    db.run(`CREATE INDEX IF NOT EXISTS idx_tools_category ON tools(category)`);
   }
 
   private _persist(projectName: string): void {
     const entry = this._dbs[projectName];
     if (!entry) return;
     const data = entry.db.export();
-    fs.writeFileSync(entry.path, Buffer.from(data));
+    atomicWrite(entry.path, Buffer.from(data));
     entry.dirty = false;
   }
 
@@ -153,22 +141,25 @@ export class SqliteStore implements StorageAdapter {
     const s = createSession(session);
     s.endedAt = s.endedAt || new Date().toISOString();
 
+    const release = acquireLock(path.join(this.baseDir, memorySegment(s.projectName) + '.lock'));
+    try {
     const db = this._getDb(s.projectName);
     db.run(`
       INSERT OR REPLACE INTO snapshots
       (id, agent_name, agent_type, model, started_at, ended_at,
-       turn_count, token_estimate, keys, context, parent_session_id, project_name)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       turn_count, token_estimate, keys, context, parent_session_id, project_name, metadata)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       s.id, s.agentName, s.agentType, s.model,
       s.startedAt, s.endedAt,
       s.turnCount, s.tokenEstimate,
       JSON.stringify(s.keys), JSON.stringify(s.context),
-      s.parentSessionId, s.projectName,
+      s.parentSessionId, s.projectName, JSON.stringify({ source: s.source, importance: s.importance, accessCount: s.accessCount, lastAccessed: s.lastAccessed, tier: s.tier }),
     ]);
 
     this._persist(s.projectName);
     return s.id;
+    } finally { release(); }
   }
 
   /** Load the most recent snapshot */
@@ -238,8 +229,10 @@ export class SqliteStore implements StorageAdapter {
       .sort((a, b) => b._score - a._score);
   }
 
-  /** Forgetting Curve GC — retention score determines survival */
+  /** Forgetting Curve GC - retention score determines survival */
   async gc(projectName: string, maxAgeDays: number = 30, maxCount: number = 50): Promise<GCResult> {
+    const release = acquireLock(path.join(this.baseDir, memorySegment(projectName) + '.lock'));
+    try {
     const db = this._getDb(projectName);
 
     // Load all snapshots for this project
@@ -256,9 +249,14 @@ export class SqliteStore implements StorageAdapter {
     const survivors: Array<{ snap: SessionData; score: number }> = [];
     const DECAY_RATE = 0.05;
 
+    const owners = new Set<string>();
+    const protectedIds = new Set(snapshots.filter(s => {
+      const latest = !owners.has(s.agentName); owners.add(s.agentName);
+      return latest || s.importance >= 0.8;
+    }).map(s => s.id));
     for (const snap of snapshots) {
       const ts = new Date(snap.endedAt || snap.startedAt).getTime();
-      if (ts < cutoff) {
+      if (ts < cutoff && !protectedIds.has(snap.id)) {
         db.run('DELETE FROM snapshots WHERE id = ?', [snap.id]);
         deleted++;
         continue;
@@ -269,7 +267,7 @@ export class SqliteStore implements StorageAdapter {
     // Enforce maxCount: remove lowest-scored snapshots
     if (survivors.length > maxCount) {
       survivors.sort((a, b) => a.score - b.score);
-      const excess = survivors.slice(0, survivors.length - maxCount);
+      const excess = survivors.filter(s => !protectedIds.has(s.snap.id)).slice(0, survivors.length - maxCount);
       for (const { snap } of excess) {
         db.run('DELETE FROM snapshots WHERE id = ?', [snap.id]);
         deleted++;
@@ -278,6 +276,7 @@ export class SqliteStore implements StorageAdapter {
 
     if (deleted > 0) this._persist(projectName);
     return { deleted };
+    } finally { release(); }
   }
 
   /** Calculate Forgetting Curve retention score */
@@ -294,7 +293,9 @@ export class SqliteStore implements StorageAdapter {
     const row: Record<string, SqlJsValue> = {};
     columns.forEach((col, i) => { row[col] = values[i] ?? null; });
 
+    const metadata = JSON.parse(String(row.metadata || '{}')) as Partial<SessionData>;
     return {
+      ...(metadata.source ? { source: metadata.source } : {}),
       schemaVersion: 2,
       id: String(row.id || ''),
       agentName: String(row.agent_name || 'unknown'),
@@ -308,15 +309,17 @@ export class SqliteStore implements StorageAdapter {
       context: JSON.parse(String(row.context || '{}')) as SessionContext,
       parentSessionId: row.parent_session_id ? String(row.parent_session_id) : null,
       projectName: String(row.project_name || ''),
-      accessCount: 0,
-      lastAccessed: String(row.ended_at || row.started_at || ''),
-      importance: 0.5,
-      tier: 'warm',
+      accessCount: metadata.accessCount ?? 0,
+      lastAccessed: metadata.lastAccessed || String(row.ended_at || row.started_at || ''),
+      importance: metadata.importance ?? 0.5,
+      tier: metadata.tier || 'warm',
     };
   }
 
-  /** Touch a snapshot — increment access count, update lastAccessed */
+  /** Touch a snapshot - increment access count, update lastAccessed */
   async touch(projectName: string, snapshotId: string): Promise<boolean> {
+    const release = acquireLock(path.join(this.baseDir, memorySegment(projectName) + '.lock'));
+    try {
     const snap = await this.loadById(projectName, snapshotId);
     if (!snap) return false;
 
@@ -324,25 +327,25 @@ export class SqliteStore implements StorageAdapter {
     const now = new Date().toISOString();
     const newCount = (snap.accessCount || 0) + 1;
     db.run(
-      'UPDATE snapshots SET context = json_set(context, "$.accessCount", ?, "$.lastAccessed", ?) WHERE id = ?',
-      [newCount, now, snapshotId],
+      'UPDATE snapshots SET metadata = ? WHERE id = ?',
+      [JSON.stringify({ source: snap.source, importance: snap.importance, tier: snap.tier, accessCount: newCount, lastAccessed: now }), snapshotId],
     );
     this._persist(projectName);
     return true;
+    } finally { release(); }
   }
 
   /** Close all connections and persist */
   dispose(): void {
-    for (const [name, entry] of Object.entries(this._dbs)) {
-      this._persist(name);
+    for (const entry of Object.values(this._dbs)) {
       try { entry.db.close(); } catch { /* ignore */ }
     }
-    this._dbs = {};
+    this._dbs = Object.create(null) as Record<string, DbEntry>;
   }
 
   /** Migrate JSON snapshots to SQLite */
   async migrateFromJson(jsonBaseDir: string, projectName: string): Promise<{ migrated: number; errors: number }> {
-    const projectDir = path.join(jsonBaseDir, projectName);
+    const projectDir = path.join(jsonBaseDir, memorySegment(projectName));
     if (!fs.existsSync(projectDir)) return { migrated: 0, errors: 0 };
 
     let migrated = 0;

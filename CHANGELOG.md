@@ -2,6 +2,31 @@
 
 All notable changes to Soul are documented here.
 
+## [9.2.0] — 2026-10-30
+
+### Continuity and retention
+- Persist work sessions with UUIDs; add `n2_work_sessions`, explicit work ownership and restart-safe completion retries with stable checkpoint/ledger IDs.
+- Preserve original summaries. Protect latest-per-agent and importance >= 0.8 checkpoints during GC. Stop pruning ledgers as a completion side effect.
+- Add atomic writes, corruption checks, safe path segments, Unicode core identities and cross-process write exclusion. Fix stale cache/SQLite instances and backend initialization before completion.
+- Scope checkpoint load/search by exact agent and project; preserve identities without aliases. Add bounded bilingual lexical recall, correction precedence and source excerpts.
+- Preserve backup metadata, honor custom storage paths, avoid rapid backup ID collisions and serialize backup creation.
+
+### Reviewed learning and lifecycle
+- Add scoped Mimir report receipts, durable study collection, lesson proposals, evidence artifacts and explicit reviews. No inferred execution success or generated executable policy.
+- Require distinct completed-work evidence and review of current corrections before lesson promotion. Recheck source/artifact integrity on recall.
+- Add an opt-in `dist/lifecycle.js` command for host-supplied start/stop/compaction events. Bounded, redacted excerpts live separately from manual checkpoints; no automatic host installation or watcher.
+- Keep distribution free of preset personas, private records and local configuration.
+
+### Distribution and compatibility
+- Update MCP SDK and Zod (v4), refresh dependency lockfile, and require Node.js >=20.19. Existing internal-module consumers must use compatible Zod schemas.
+- Rewrite English/Korean installation, migration, backup and lifecycle documentation, including current entry paths and honest continuity limits.
+- Add isolated tarball install/MCP restart/retry validation and private-content checks to the prepublish gate.
+- Old unfinished sessions existed only in RAM: finish/save them before stopping 9.0.9. Back up the complete data directory before upgrading or rolling back.
+
+## [9.0.9] — 2026-04-02
+
+- Restrict npm contents to compiled runtime and declaration files, excluding compiled tests.
+
 ## [9.0.7] — 2026-03-27
 
 ### PerfMonitor — Self-Tuning GC

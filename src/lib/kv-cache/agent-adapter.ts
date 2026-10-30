@@ -1,4 +1,4 @@
-// Soul KV-Cache v9.0 — Agent adapter. Converts browser/MCP sessions to unified KV schema.
+// Soul KV-Cache v9.0 - Agent adapter. Converts browser/MCP sessions to unified KV schema.
 import { createSession } from './schema';
 import type { SessionData } from './schema';
 
@@ -27,6 +27,8 @@ interface FileChangeInput {
 }
 
 interface McpSessionInput {
+  id?: string;
+  importance?: number;
   agent?: string;
   project?: string;
   summary?: string;
@@ -103,6 +105,8 @@ export function fromMcpSession(workEndData: McpSessionInput): SessionData {
 
   return createSession({
     agentName: d.agent || 'unknown',
+    id: d.id,
+    importance: d.importance,
     agentType: 'mcp',
     startedAt: d.startedAt,
     keys: extractKeywords(d.summary || ''),

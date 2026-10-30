@@ -20,3 +20,12 @@ PLAN.md
 task.md
 walkthrough.md
 implementation_plan.md
+
+# Durable runtime and verification artifacts
+data/work-sessions/
+data/evidence/
+data/mimir.db*
+data/lifecycle/
+tests/.tmp/
+.release-check/
+*.tgz

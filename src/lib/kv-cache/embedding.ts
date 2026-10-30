@@ -1,4 +1,4 @@
-// Soul KV-Cache v9.0 — Embedding engine. Vector embeddings via Ollama.
+// Soul KV-Cache v9.0 - Embedding engine. Vector embeddings via Ollama.
 import http from 'http';
 import type { SessionData } from './schema';
 

@@ -1,10 +1,10 @@
-// Soul v9.0 — Default config. Zero hardcoded paths, all dynamic.
+// Soul v9.0 - Default config. Zero hardcoded paths, all dynamic.
 import path from 'path';
 import type { SoulConfig } from '../types';
 
 const defaults: SoulConfig = {
   SOUL_ROOT: path.resolve(__dirname, '..', '..'),
-  DATA_DIR: path.resolve(__dirname, '..', '..', 'data'),
+  DATA_DIR: process.env.N2_DATA_DIR ? path.resolve(process.env.N2_DATA_DIR) : path.resolve(__dirname, '..', '..', 'data'),
   TIMEZONE: 'Asia/Seoul',
   AGENTS_DIR: null,
   LANG: process.env.N2_LANG || 'en',
@@ -34,7 +34,7 @@ const defaults: SoulConfig = {
     enabled: true,
     autoSaveOnWorkEnd: true,
     autoLoadOnBoot: true,
-    backend: 'json',
+    backend: process.env.N2_KV_BACKEND === 'sqlite' ? 'sqlite' : 'json',
     maxSnapshotsPerProject: 50,
     maxSnapshotAgeDays: 30,
     compressionTarget: 1000,

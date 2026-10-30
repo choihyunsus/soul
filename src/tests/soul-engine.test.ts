@@ -1,4 +1,4 @@
-// Soul v9.0 — SoulEngine unit tests. Validates board CRUD, ledger write, file ownership.
+// Soul v9.0 - SoulEngine unit tests. Validates board CRUD, ledger write, file ownership.
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'fs';
@@ -44,7 +44,7 @@ describe('SoulEngine', () => {
 
   describe('Ledger', () => {
     it('should write immutable ledger entry', () => {
-      const result = engine.writeLedger(PROJECT, 'rose', {
+      const result = engine.writeLedger(PROJECT, 'alpha', {
         startedAt: new Date().toISOString(),
         title: 'Test work',
         summary: 'Did some testing',
@@ -59,27 +59,27 @@ describe('SoulEngine', () => {
       assert.ok(fs.existsSync(result.path));
 
       const content = JSON.parse(fs.readFileSync(result.path, 'utf-8'));
-      assert.strictEqual(content.agent, 'rose');
+      assert.strictEqual(content.agent, 'alpha');
       assert.strictEqual(content.title, 'Test work');
     });
   });
 
   describe('File Ownership', () => {
     it('should claim file successfully', () => {
-      const result = engine.claimFile(PROJECT, 'src/index.ts', 'rose', 'editing');
+      const result = engine.claimFile(PROJECT, 'src/index.ts', 'alpha', 'editing');
       assert.strictEqual(result.ok, true);
     });
 
     it('should block duplicate claims from other agents', () => {
-      engine.claimFile(PROJECT, 'src/blocked.ts', 'rose', 'editing');
+      engine.claimFile(PROJECT, 'src/blocked.ts', 'alpha', 'editing');
       const result = engine.claimFile(PROJECT, 'src/blocked.ts', 'lisa', 'also editing');
       assert.strictEqual(result.ok, false);
-      assert.strictEqual(result.owner, 'rose');
+      assert.strictEqual(result.owner, 'alpha');
     });
 
     it('should release files by agent', () => {
-      engine.claimFile(PROJECT, 'src/release-me.ts', 'rose', 'temp');
-      engine.releaseFiles(PROJECT, 'rose');
+      engine.claimFile(PROJECT, 'src/release-me.ts', 'alpha', 'temp');
+      engine.releaseFiles(PROJECT, 'alpha');
 
       const result = engine.claimFile(PROJECT, 'src/release-me.ts', 'lisa', 'free now');
       assert.strictEqual(result.ok, true);

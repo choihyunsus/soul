@@ -1,4 +1,4 @@
-// Soul v9.0 — KV-Cache unit tests. Validates snapshot save/load/search, compressor, GC.
+// Soul v9.0 - KV-Cache unit tests. Validates snapshot save/load/search, compressor, GC.
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'fs';
@@ -31,7 +31,7 @@ describe('KV-Cache', () => {
 
   describe('save / load round-trip', () => {
     it('should save a snapshot and return an ID', async () => {
-      const id = await cache.save('rose', PROJECT, {
+      const id = await cache.save('alpha', PROJECT, {
         summary: 'Implemented TypeScript migration for Soul v9.0',
         decisions: ['Use strict mode', 'No any types'],
         todo: ['Write tests', 'Run ESLint'],

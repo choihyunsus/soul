@@ -1,4 +1,4 @@
-// Soul v9.0 — Dispose pattern tests. Validates timer cleanup to prevent memory leaks.
+// Soul v9.0 - Dispose pattern tests. Validates timer cleanup to prevent memory leaks.
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'fs';
@@ -6,7 +6,7 @@ import path from 'path';
 import os from 'os';
 
 import { SoulKVCache } from '../lib/kv-cache';
-import { disposeWorkSequence, activeSessions } from '../sequences/work';
+import { disposeWorkSequence } from '../sequences/work';
 
 describe('Dispose patterns (memory leak prevention)', () => {
   describe('SoulKVCache.dispose()', () => {
@@ -57,9 +57,5 @@ describe('Dispose patterns (memory leak prevention)', () => {
       assert.doesNotThrow(() => disposeWorkSequence());
     });
 
-    it('should clean up active sessions reference', () => {
-      // Verify activeSessions is an accessible object
-      assert.ok(typeof activeSessions === 'object');
-    });
   });
 });

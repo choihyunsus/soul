@@ -1,4 +1,4 @@
-// Soul KV-Cache v9.0 — Progressive loading. Extracts context at L1/L2/L3 token budgets.
+// Soul KV-Cache v9.0 - Progressive loading. Extracts context at L1/L2/L3 token budgets.
 import type { SessionData } from './schema';
 
 interface LevelSpec {

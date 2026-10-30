@@ -1,4 +1,4 @@
-// Soul v9.0 — Dynamic agent registry. Detects agents from N2 Browser config.
+// Soul v9.0 - Dynamic agent registry. Detects agents from N2 Browser config.
 import fs from 'fs';
 import path from 'path';
 import { logError, readJson } from './utils';

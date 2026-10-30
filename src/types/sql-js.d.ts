@@ -1,4 +1,4 @@
-// Soul v9.0 — Type declaration for sql.js (no @types/sql.js available)
+// Soul v9.0 - Type declaration for sql.js (no @types/sql.js available)
 declare module 'sql.js' {
   interface SqlJsStatic {
     Database: new (data?: ArrayLike<number> | Buffer | null) => Database;

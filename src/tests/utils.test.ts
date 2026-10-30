@@ -1,4 +1,4 @@
-// Soul v9.0 — Utils unit tests. Validates core utility functions.
+// Soul v9.0 - Utils unit tests. Validates core utility functions.
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'fs';

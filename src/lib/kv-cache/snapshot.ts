@@ -1,4 +1,4 @@
-// Soul KV-Cache v9.0 — Snapshot engine. Creates/restores session snapshots from disk.
+// Soul KV-Cache v9.0 - Snapshot engine. Creates/restores session snapshots from disk.
 import fs from 'fs';
 import fsp from 'fs/promises';
 import path from 'path';
@@ -7,6 +7,7 @@ import type { SessionData, SessionInput } from './schema';
 import type { SnapshotTier } from '../../types';
 import type { StorageAdapter, GCResult } from './storage-adapter';
 import { logError } from '../utils';
+import { atomicJsonWrite, memorySegment } from './atomic-json';
 
 interface ScoredSnapshot extends SessionData {
   _score: number;
@@ -23,7 +24,7 @@ const MS_PER_DAY = 1000 * 60 * 60 * 24;
 
 /**
  * Forgetting Curve retention score.
- * R = importance × (1 + log2(1 + accessCount)) × e^(-λ × ageInDays)
+ * R = importance * (1 + log2(1 + accessCount)) * e^(-lambda * ageInDays)
  */
 export function calculateRetention(snap: SessionData): number {
   const importance = snap.importance ?? 0.5;
@@ -53,11 +54,11 @@ export class SnapshotEngine implements StorageAdapter {
     s.endedAt = s.endedAt || new Date().toISOString();
 
     const dateStr = (s.endedAt ?? '').split('T')[0] ?? '';
-    const dir = path.join(this.baseDir, s.projectName, dateStr);
+    const dir = path.join(this.baseDir, memorySegment(s.projectName), memorySegment(dateStr));
     await fsp.mkdir(dir, { recursive: true });
 
-    const filePath = path.join(dir, `${s.id}.json`);
-    await fsp.writeFile(filePath, JSON.stringify(s, null, 2), 'utf-8');
+    const filePath = path.join(dir, `${memorySegment(s.id)}.json`);
+    await atomicJsonWrite(filePath, s);
     return s.id;
   }
 
@@ -69,12 +70,12 @@ export class SnapshotEngine implements StorageAdapter {
 
   /** Load a specific snapshot by ID */
   async loadById(projectName: string, snapshotId: string): Promise<SessionData | null> {
-    const projectDir = path.join(this.baseDir, projectName);
+    const projectDir = path.join(this.baseDir, memorySegment(projectName));
     if (!fs.existsSync(projectDir)) return null;
 
     const dateDirs = this._getDateDirs(projectDir);
     for (const dateDir of dateDirs) {
-      const filePath = path.join(dateDir, `${snapshotId}.json`);
+      const filePath = path.join(dateDir, `${memorySegment(snapshotId)}.json`);
       if (fs.existsSync(filePath)) {
         return await this._readSnapshot(filePath);
       }
@@ -84,7 +85,7 @@ export class SnapshotEngine implements StorageAdapter {
 
   /** List snapshots for a project, sorted by recency */
   async list(projectName: string, limit: number = 10): Promise<SessionData[]> {
-    const projectDir = path.join(this.baseDir, projectName);
+    const projectDir = path.join(this.baseDir, memorySegment(projectName));
     if (!fs.existsSync(projectDir)) return [];
 
     const dateDirs = this._getDateDirs(projectDir);
@@ -138,7 +139,7 @@ export class SnapshotEngine implements StorageAdapter {
       .slice(0, limit);
   }
 
-  /** Forgetting Curve GC — retention score determines survival */
+  /** Forgetting Curve GC - retention score determines survival */
   async gc(projectName: string, maxAgeDays: number = 30, maxCount: number = 50): Promise<GCResult> {
     const snapshots = await this.list(projectName, 9999);
     let deleted = 0;
@@ -146,10 +147,15 @@ export class SnapshotEngine implements StorageAdapter {
     const tiered = { hot: 0, warm: 0, cold: 0 };
     const survivors: Array<{ snap: SessionData; score: number }> = [];
 
+    const owners = new Set<string>();
+    const protectedIds = new Set(snapshots.filter(s => {
+      const latest = !owners.has(s.agentName); owners.add(s.agentName);
+      return latest || s.importance >= 0.8;
+    }).map(s => s.id));
     for (const snap of snapshots) {
       const ts = new Date(snap.endedAt || snap.startedAt).getTime();
 
-      if (ts < cutoff) {
+      if (ts < cutoff && !protectedIds.has(snap.id)) {
         this._deleteSnapshot(snap);
         deleted++;
         continue;
@@ -169,7 +175,7 @@ export class SnapshotEngine implements StorageAdapter {
 
     if (survivors.length > maxCount) {
       survivors.sort((a, b) => a.score - b.score);
-      const excess = survivors.slice(0, survivors.length - maxCount);
+      const excess = survivors.filter(s => !protectedIds.has(s.snap.id)).slice(0, survivors.length - maxCount);
       for (const { snap } of excess) {
         this._deleteSnapshot(snap);
         deleted++;
@@ -180,7 +186,7 @@ export class SnapshotEngine implements StorageAdapter {
     return { deleted, tiered };
   }
 
-  /** Touch a snapshot — increment access count, update lastAccessed */
+  /** Touch a snapshot - increment access count, update lastAccessed */
   async touch(projectName: string, snapshotId: string): Promise<boolean> {
     const snap = await this.loadById(projectName, snapshotId);
     if (!snap) return false;
@@ -203,12 +209,12 @@ export class SnapshotEngine implements StorageAdapter {
   private async _patchSnapshot(snap: SessionData, patch: SnapshotPatch): Promise<void> {
     const dateStr = (snap.endedAt || snap.startedAt || '').split('T')[0];
     if (!dateStr) return;
-    const filePath = path.join(this.baseDir, snap.projectName, dateStr, `${snap.id}.json`);
+    const filePath = path.join(this.baseDir, memorySegment(snap.projectName), memorySegment(dateStr), `${memorySegment(snap.id)}.json`);
     try {
       const raw = await fsp.readFile(filePath, 'utf-8');
       const data = JSON.parse(raw) as Record<string, unknown>;
       Object.assign(data, patch);
-      await fsp.writeFile(filePath, JSON.stringify(data, null, 2), 'utf-8');
+      await atomicJsonWrite(filePath, data);
     } catch (e) {
       logError('snapshot:patch', `${snap.id}: ${e instanceof Error ? e.message : String(e)}`);
     }
@@ -217,7 +223,11 @@ export class SnapshotEngine implements StorageAdapter {
   private async _readSnapshot(filePath: string): Promise<SessionData | null> {
     try {
       const raw = await fsp.readFile(filePath, 'utf-8');
-      return migrateSession(JSON.parse(raw) as Partial<SessionData>);
+      const value = JSON.parse(raw) as Partial<SessionData>;
+      if (!value || typeof value !== 'object' || typeof value.id !== 'string' || value.id + '.json' !== path.basename(filePath) || value.projectName !== path.basename(path.dirname(path.dirname(filePath))) || !value.context || typeof value.context.summary !== 'string') {
+        throw new Error('Invalid snapshot identity/schema; original preserved');
+      }
+      return migrateSession(value);
     } catch (e) {
       logError('snapshot:read', `${path.basename(filePath)}: ${e instanceof Error ? e.message : String(e)}`);
       return null;
@@ -227,7 +237,7 @@ export class SnapshotEngine implements StorageAdapter {
   private _deleteSnapshot(snap: SessionData): void {
     const dateStr = (snap.endedAt || snap.startedAt || '').split('T')[0];
     if (!dateStr) return;
-    const filePath = path.join(this.baseDir, snap.projectName, dateStr, `${snap.id}.json`);
+    const filePath = path.join(this.baseDir, memorySegment(snap.projectName), memorySegment(dateStr), `${memorySegment(snap.id)}.json`);
     try { fs.unlinkSync(filePath); } catch (e) { logError('snapshot:delete', e); }
   }
 

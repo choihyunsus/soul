@@ -1,9 +1,13 @@
-// Soul KV-Cache v9.0 — MCP tool registration. Exposes KV-Cache to agents.
+// Soul KV-Cache v9.0 - MCP tool registration. Exposes KV-Cache to agents.
 import type { z as ZodType } from 'zod';
 import { SoulKVCache } from '../lib/kv-cache';
+import { getAgentName, getKvChainParent, setKvChainParent } from '../lib/context';
+import { redactMemory } from '../lib/recall';
+import { canonicalAgent } from '../lib/continuity';
 import type { McpToolServer, SoulConfig } from '../types';
 
 interface KVSaveInput {
+  importance?: number;
   agent: string;
   project: string;
   summary: string;
@@ -14,6 +18,7 @@ interface KVSaveInput {
 }
 
 interface KVLoadInput {
+  agent?: string;
   project: string;
   budget?: number;
   level?: string;
@@ -22,6 +27,7 @@ interface KVLoadInput {
 interface KVSearchInput {
   query: string;
   project: string;
+  agent?: string;
   maxResults?: number;
 }
 
@@ -45,7 +51,7 @@ interface KVBackupListInput {
   project: string;
 }
 
-// Backup types imported from ../lib/kv-cache/backup — no local duplicates needed
+// Backup types imported from ../lib/kv-cache/backup - no local duplicates needed
 
 export function registerKVCacheTools(
   server: McpToolServer,
@@ -70,27 +76,35 @@ function _registerKVCoreTools(server: McpToolServer, z: typeof ZodType, kvCache:
 function _registerKVSave(server: McpToolServer, z: typeof ZodType, kvCache: SoulKVCache): void {
   server.tool(
     'n2_kv_save',
-    'Save current session as a KV-Cache snapshot. Auto-called at n2_work_end if enabled.',
+    'Save a durable checkpoint during work or before replying. does not finish active work.',
     {
       agent: z.string().describe('Agent name'),
       project: z.string().describe('Project name'),
+      importance: z.number().min(0).max(1).optional().describe('0 to 1; values >= 0.8 are protected from automatic cleanup'),
       summary: z.string().describe('Session summary'),
       decisions: z.array(z.string()).optional().describe('Key decisions made'),
       todo: z.array(z.string()).optional().describe('TODO items for next session'),
       filesCreated: z.array(z.object({ path: z.string(), desc: z.string() })).optional().describe('Files created'),
       filesModified: z.array(z.object({ path: z.string(), desc: z.string() })).optional().describe('Files modified'),
     },
-    async ({ agent, project, summary, decisions, todo, filesCreated, filesModified }: KVSaveInput) => {
+    async ({ agent, project, summary, decisions, todo, filesCreated, filesModified, importance }: KVSaveInput) => {
       try {
-        const id = await kvCache.save(agent, project, {
-          summary, decisions: decisions ?? [], todo: todo ?? [],
+        const identity = canonicalAgent(agent);
+        const id = await kvCache.save(identity, project, {
+          summary, importance, decisions: decisions ?? [], todo: todo ?? [],
+          parentSessionId: getKvChainParent(project, identity),
           filesCreated: filesCreated ?? [], filesModified: filesModified ?? [],
         });
+        const saved = await kvCache.snapshot.loadById(project, id);
+        if (!saved || saved.agentName !== identity || saved.projectName !== project) {
+          throw new Error('Saved checkpoint could not be read back.');
+        }
+        setKvChainParent(project, id, identity);
         const snapCount = (await kvCache.listSnapshots(project)).length;
         return { content: [{ type: 'text', text: `KV-Cache saved: ${id} (${snapCount} total for ${project})` }] };
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        return { content: [{ type: 'text', text: `KV-Cache save error: ${msg}` }] };
+        return { isError: true, content: [{ type: 'text', text: `KV-Cache save error: ${msg}` }] };
       }
     },
   );
@@ -102,18 +116,19 @@ function _registerKVLoad(server: McpToolServer, z: typeof ZodType, kvCache: Soul
     'Load the most recent KV-Cache snapshot for a project. Returns compressed context.',
     {
       project: z.string().describe('Project name'),
-      budget: z.number().optional().describe('Token budget for context (default: 2000)'),
+      agent: z.string().optional().describe('Identity; defaults to boot identity'),
+      budget: z.number().int().min(1).max(32000).optional().describe('Token budget for context (default: 2000)'),
       level: z.string().optional().describe('Progressive level: L1 (minimal), L2 (standard), L3 (full), auto (default)'),
     },
-    async ({ project, budget, level }: KVLoadInput) => {
+    async ({ project, agent, budget, level }: KVLoadInput) => {
       try {
-        const snap = await kvCache.load(project, { budget, level: level ?? 'auto' });
+        const snap = await kvCache.load(project, { agent: agent ?? getAgentName(), budget, level: level ?? 'auto' });
         if (!snap) return { content: [{ type: 'text', text: `No KV-Cache snapshots found for ${project}.` }] };
         const header = `[${snap._level ?? 'auto'} | ~${snap._promptTokens ?? '?'} tokens]`;
         return { content: [{ type: 'text', text: `${header}\n${snap._resumePrompt ?? `Snapshot ${snap.id} loaded.`}` }] };
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        return { content: [{ type: 'text', text: `KV-Cache load error: ${msg}` }] };
+        return { isError: true, content: [{ type: 'text', text: `KV-Cache load error: ${msg}` }] };
       }
     },
   );
@@ -122,24 +137,27 @@ function _registerKVLoad(server: McpToolServer, z: typeof ZodType, kvCache: Soul
 function _registerKVSearch(server: McpToolServer, z: typeof ZodType, kvCache: SoulKVCache): void {
   server.tool(
     'n2_kv_search',
-    'Search across KV-Cache snapshots for relevant past sessions.',
+    'Read relevant historical snapshots for one project and agent (defaults to boot identity). Bounded lexical matching with domain aliases and correction precedence; source IDs and matched excerpts, no semantic-only ranking.',
     {
       query: z.string().describe('Search query (keywords, space-separated)'),
       project: z.string().describe('Project name'),
-      maxResults: z.number().optional().describe('Max results (default: 5)'),
+      agent: z.string().optional().describe('Memory identity; defaults to the booted agent'),
+      maxResults: z.number().int().min(1).max(10).optional().describe('Max results (default: 5)'),
     },
-    async ({ query, project, maxResults }: KVSearchInput) => {
+    async ({ query, project, agent, maxResults }: KVSearchInput) => {
       try {
-        const results = await kvCache.search(query, project, maxResults ?? 5);
-        if (results.length === 0) return { content: [{ type: 'text', text: `No KV-Cache results for "${query}" in ${project}.` }] };
-        const lines = results.map((r, i) => {
-          const date = (r.endedAt ?? r.startedAt ?? '').split('T')[0] ?? '';
-          return `${i + 1}. [${date}] ${r.agentName} | ${r.keys.slice(0, 5).join(', ')}\n   ${(r.context?.summary ?? '').slice(0, 150)}`;
-        });
-        return { content: [{ type: 'text', text: `KV-Cache search: "${query}" (${results.length} results)\n\n${lines.join('\n\n')}` }] };
+        const found = await kvCache.searchScoped(query, project, agent ?? getAgentName(), maxResults ?? 5);
+        let text = '[Historical KV-Cache references; current user instructions take precedence. No result means no match within the search budget.]';
+        for (const row of found.results) {
+          const line = '\n' + JSON.stringify({ project, ...row, source: 'KV-Cache snapshot ' + row.id });
+          if (Buffer.byteLength(text + line) > 5900) { found.limited = true; continue; }
+          text += line;
+        }
+        if (found.limited) text += '\n[Search/output budget reached; additional records may exist.]';
+        return { content: [{ type: 'text', text }] };
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        return { content: [{ type: 'text', text: `KV-Cache search error: ${msg}` }] };
+        return { isError: true, content: [{ type: 'text', text: `KV-Cache search error: ${redactMemory(msg)}` }] };
       }
     },
   );
@@ -152,7 +170,7 @@ function _registerKVMaintenanceTools(server: McpToolServer, z: typeof ZodType, k
     'Remove old KV-Cache snapshots. Uses config defaults if no args.',
     {
       project: z.string().describe('Project name'),
-      maxAgeDays: z.number().optional().describe('Delete older than N days'),
+      maxAgeDays: z.number().int().min(0).optional().describe('Delete older than N days'),
     },
     async ({ project, maxAgeDays }: KVGcInput) => {
       try {
@@ -161,7 +179,7 @@ function _registerKVMaintenanceTools(server: McpToolServer, z: typeof ZodType, k
         return { content: [{ type: 'text', text: `KV-Cache GC: ${result.deleted} deleted, ${remaining} remaining for ${project}.` }] };
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        return { content: [{ type: 'text', text: `KV-Cache GC error: ${msg}` }] };
+        return { isError: true, content: [{ type: 'text', text: `KV-Cache GC error: ${msg}` }] };
       }
     },
   );
@@ -195,7 +213,7 @@ function _registerKVBackup(server: McpToolServer, z: typeof ZodType, kvCache: So
         };
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        return { content: [{ type: 'text', text: `KV-Cache backup error: ${msg}` }] };
+        return { isError: true, content: [{ type: 'text', text: `KV-Cache backup error: ${msg}` }] };
       }
     },
   );
@@ -208,7 +226,7 @@ function _registerKVRestore(server: McpToolServer, z: typeof ZodType, kvCache: S
     {
       project: z.string().describe('Project name'),
       backupId: z.string().optional().describe('Backup ID (default: latest)'),
-      target: z.string().optional().describe('Restore target: json (default) or sqlite'),
+      target: z.enum(['json', 'sqlite']).optional().describe('Restore target: json (default) or sqlite'),
     },
     async ({ project, backupId, target }: KVRestoreInput) => {
       try {
@@ -216,7 +234,7 @@ function _registerKVRestore(server: McpToolServer, z: typeof ZodType, kvCache: S
         type RestoreTarget = typeof validTargets[number];
         const safeTarget: RestoreTarget | undefined = validTargets.includes(target as RestoreTarget) ? target as RestoreTarget : undefined;
         const result = await kvCache.restore(project, backupId, { target: safeTarget });
-        if (result.error) return { content: [{ type: 'text', text: `KV-Cache restore error: ${result.error}` }] };
+        if (result.error) return { isError: true, content: [{ type: 'text', text: `KV-Cache restore error: ${result.error}` }] };
         return {
           content: [{
             type: 'text',
@@ -225,7 +243,7 @@ function _registerKVRestore(server: McpToolServer, z: typeof ZodType, kvCache: S
         };
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        return { content: [{ type: 'text', text: `KV-Cache restore error: ${msg}` }] };
+        return { isError: true, content: [{ type: 'text', text: `KV-Cache restore error: ${msg}` }] };
       }
     },
   );

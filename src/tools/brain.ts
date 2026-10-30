@@ -1,4 +1,4 @@
-// Soul MCP v9.0 — Brain tools. Shared memory + Entity Memory + Core Memory.
+// Soul MCP v9.0 - Brain tools. Shared memory + Entity Memory + Core Memory.
 import path from 'path';
 import type { z as ZodType } from 'zod';
 import { readFile, writeFile, safePath } from '../lib/utils';
@@ -47,7 +47,7 @@ function _registerEntityTools(server: McpToolServer, z: typeof ZodType, entityMe
       entities: z.array(z.object({
         type: z.string().describe('Entity type: person, hardware, project, concept, place, service'),
         name: z.string().describe('Entity name'),
-        attributes: z.record(z.union([z.string(), z.number(), z.boolean(), z.null()])).optional().describe('Key-value attributes'),
+        attributes: z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()])).optional().describe('Key-value attributes'),
       })).describe('Entities to upsert'),
     },
     async ({ entities }: { entities: EntityInput[] }) => {

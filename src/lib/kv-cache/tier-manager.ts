@@ -1,4 +1,4 @@
-// Soul KV-Cache v9.0 — Tiered storage manager. Hot/Warm/Cold lifecycle.
+// Soul KV-Cache v9.0 - Tiered storage manager. Hot/Warm/Cold lifecycle.
 import type { SessionData, SessionInput } from './schema';
 import type { SnapshotTier } from '../../types';
 import type { StorageAdapter } from './storage-adapter';
@@ -94,20 +94,8 @@ export class TierManager implements StorageAdapter {
     return id;
   }
 
-  /** Load latest with hot-cache check first */
+  /** Read through to disk so other processes cannot be hidden by the hot cache. */
   async loadLatest(projectName: string): Promise<SessionData | null> {
-    const cache = this._hotCache[projectName];
-    if (cache) {
-      const entries = Object.values(cache);
-      if (entries.length > 0) {
-        entries.sort((a, b) => {
-          const ta = new Date(b.endedAt || b.startedAt).getTime();
-          const tb = new Date(a.endedAt || a.startedAt).getTime();
-          return ta - tb;
-        });
-        return entries[0] ?? null;
-      }
-    }
     return await this.engine.loadLatest(projectName);
   }
 
@@ -189,5 +177,6 @@ export class TierManager implements StorageAdapter {
   /** Dispose all caches */
   dispose(): void {
     this._hotCache = {};
+    this.engine.dispose?.();
   }
 }

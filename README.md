@@ -1,586 +1,161 @@
 [한국어](README.ko.md)
 
-# Soul
+# Soul 9.2
 
-[![npm version](https://img.shields.io/npm/v/n2-soul.svg)](https://www.npmjs.com/package/n2-soul)
-[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
-[![Node](https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg)](https://nodejs.org)
-[![npm downloads](https://img.shields.io/npm/dm/n2-soul.svg)](https://www.npmjs.com/package/n2-soul)
-[![v9.0.0](https://img.shields.io/badge/v9.0.0-Strict%20TypeScript-blueviolet.svg)](#whats-new-in-v90)
+Persistent memory and resumable work for MCP agents. Soul stores checkpoints, work records, shared handoffs and source-linked learning reports locally. It restores saved material when an agent calls its tools; it does not preserve a model's full context or guarantee those calls.
 
-Your AI agent forgets everything when a session ends. Soul fixes that.
+This distribution contains no preset persona, private memories, local configuration or installed host hooks. Choose your own stable agent and project names.
 
-Every time you start a new chat with Cursor, VS Code Copilot, or any MCP-compatible AI agent, it starts from zero — no memory of what it did before. Soul is an MCP server that gives your agents:
+## What's new
 
-- **Persistent memory** that survives across sessions
-- **Handoffs** so one agent can pick up where another left off
-- **Work history** recorded as an immutable log
-- **Shared brain** so multiple agents can read/write the same context
-- **Entity Memory** — auto-tracks people, hardware, projects
-- **Core Memory** — agent-specific always-loaded facts
+- Durable work sessions with unique `sessionId`s. Resume after restart and retry interrupted completion without duplicating its checkpoint or ledger.
+- Atomic file publication, write exclusion for work/core/SQLite mutations, corruption checks and Windows path validation.
+- Original checkpoint text retained on disk; compression applies to restored context only.
+- Agent-scoped load/search with bilingual domain terms, source IDs and explicit correction precedence.
+- Cleanup protects the latest checkpoint **per agent in each project**, and every checkpoint with `importance >= 0.8`. Protected records can exceed count limits. Completion no longer deletes old work ledgers.
+- Scoped study reports and evidence-reviewed lessons. Reports do not automatically become facts, successful outcomes or executable rules.
+- An optional lifecycle command for host-provided start/stop/compaction events. Automatic excerpts remain separate from manual checkpoints.
+- Updated dependencies, package-content checks and isolated-install verification.
 
-**Works great with the N2 ecosystem:**
-[**Ark**](https://github.com/choihyunsus/n2-ark) (AI safety) · [**Arachne**](https://github.com/choihyunsus/n2-arachne) (code context) · [**QLN**](https://github.com/choihyunsus/n2-QLN) (tool routing)
+## Install
 
-**Soul is one small component of N2 Browser** — an AI-native browser we're building. Multi-agent orchestration, real-time tool routing, inter-agent communication, and much more are currently in testing. This is just the beginning.
+Use Node.js 22 or 24 LTS and an MCP client supporting local stdio servers. The runtime requires Node.js 20.19 or newer. Mimir uses `better-sqlite3`; platforms without a matching prebuilt binary need a native build toolchain.
 
-## Table of Contents
-
-- [What's New in v9.0](#whats-new-in-v90)
-- [Quick Start](#quick-start)
-- [Why Soul?](#why-soul)
-- [Features](#features)
-- [Cloud Storage](#cloud-storage--store-your-ai-memory-anywhere)
-- [Available Tools](#available-tools)
-- [Configuration](#configuration)
-- [Contributing](#contributing)
-- [Changelog](CHANGELOG.md)
-
-## What's New in v9.0
-
-**Strict TypeScript — Zero `any`, zero memory leaks, automated quality enforcement.**
-
-### Full TypeScript Strict Mode
-
-- Source code migrated to TypeScript with `strict: true`
-- **Zero `any`** — every type is explicit and verifiable
-- ESLint `strictTypeChecked` rules catch floating promises, type safety violations
-- 30 unit tests with `npm run verify` one-command pipeline
-
-### Security & Memory Audit
-
-- WASM memory leak fix — `stmt.free()` wrapped in `try/finally`
-- Silent error swallowing eliminated — all `.catch()` handlers log errors
-- HTTP response size limits for embedding requests
-- `dispose()` methods for proper timer cleanup
-
-### v8.0 Features (Included)
-
-- **Forgetting Curve GC** — intelligent memory retention based on access patterns
-- **Async I/O** — non-blocking operations, 42% faster KV load
-- **3-tier memory** — Hot → Warm → Cold lifecycle
-
-See [CHANGELOG.md](CHANGELOG.md) for full version history.
-
----
-
-## Quick Start
-
-### 1. Install
-
-**Option A: npm (recommended)**
-```bash
+```sh
 npm install n2-soul
 ```
 
-**Option B: From source**
-```bash
-git clone https://github.com/choihyunsus/soul.git
-cd soul
-npm install
-```
+For an unpublished candidate, install the locally built `n2-soul-9.2.0.tgz` instead. An npm install retrieves the version currently published there.
 
-### 2. Add Soul to your MCP config
+Register the **absolute installed entry path** in your client's MCP configuration. Adapt the surrounding format to that client:
 
-Soul is a standard MCP server (stdio). Add it to your host's config:
-
-<details>
-<summary><strong>Cursor / VS Code Copilot / Claude Desktop</strong></summary>
-
-Add to `mcp.json`, `settings.json`, or `claude_desktop_config.json`:
 ```json
 {
- "mcpServers": {
- "soul": {
- "command": "node",
- "args": ["/path/to/node_modules/n2-soul/index.js"]
- }
- }
+  "mcpServers": {
+    "soul": {
+      "command": "node",
+      "args": ["C:/tools/soul/node_modules/n2-soul/dist/index.js"],
+      "env": {
+        "N2_DATA_DIR": "C:/agent-memory/soul",
+        "N2_AGENT_NAME": "assistant",
+        "N2_KV_BACKEND": "json"
+      }
+    }
+  }
 }
 ```
-</details>
 
-<details>
-<summary><strong>Ollama + Open WebUI</strong></summary>
+Replace these paths. Linux/macOS also use absolute paths, such as `/home/me/agent-memory/soul`. Keep data outside `node_modules` so package replacement cannot remove it. Without `N2_DATA_DIR`, the legacy default is `<installed-package>/data`.
 
-Open WebUI supports MCP tools natively.
+From a source checkout: `npm ci`, `npm run verify`, then `npm start`.
 
-```bash
-# 1. Make sure Ollama is running
-ollama serve
+## Continuity workflow
 
-# 2. Install Soul
-npm install n2-soul
+Use the same identity across chats, rather than the current model name. Names preserve case and Unicode; Soul does not merge aliases.
 
-# 3. Find your Soul path
-# Windows:
-echo %cd%\node_modules\n2-soul\index.js
-# Mac/Linux:
-echo $(pwd)/node_modules/n2-soul/index.js
-```
+1. Call `n2_boot({agent:"assistant", project:"demo"})` and read the checkpoint, handoff and pending work.
+2. Call `n2_work_start` with agent, project and task. Keep the returned `sessionId`.
+3. Pass that ID to `n2_work_log`. Save intermediate decisions with `n2_kv_save`, including before replies or context handoffs. Set `importance: 0.8` or higher for records automatic cleanup must retain.
+4. Call `n2_work_end` with the same identity, project, ID, title, summary and next TODOs. It completes that work record; it does not replace intermediate checkpoints.
+5. After restart, inspect `n2_work_sessions`. Retry failed completion with the **same sessionId and original input**. Changed completion input is rejected. Completed calls are idempotent; failed auxiliary report collection stays discoverable and retryable.
 
-In **Open WebUI**: Go to **Settings → Tools → MCP Servers** → Add new server:
-```
-Name: soul
-Command: node
-Args: /your/path/to/node_modules/n2-soul/index.js
-```
+Several sessions can coexist for the same agent/project. Omitting `sessionId` works only when a unique unfinished session can be identified. File ownership is per agent and is released after its last active session ends.
 
-Now any model you chat with in Open WebUI can use Soul's 20+ memory tools.
-</details>
+Boot restores that agent's checkpoint. Project boards, general brain files, entity memory and legacy `n2_context_search` are **shared workspace records**. Names are organizational scopes, not authentication between untrusted users. Use separate data directories for unrelated installations.
 
-<details>
-<summary><strong>LM Studio</strong></summary>
+## Tools
 
-LM Studio supports MCP natively. Add to `~/.lmstudio/mcp.json`:
+| Area | Tools |
+| --- | --- |
+| Boot/work | `n2_boot`, `n2_work_start`, `n2_work_sessions`, `n2_work_claim`, `n2_work_log`, `n2_work_end` |
+| Checkpoints | `n2_kv_save`, `n2_kv_load`, `n2_kv_search`, `n2_kv_gc` |
+| Checkpoint backup | `n2_kv_backup`, `n2_kv_restore`, `n2_kv_backup_list` |
+| Shared memory | `n2_brain_read`, `n2_brain_write`, `n2_entity_upsert`, `n2_entity_search`, `n2_context_search` |
+| Agent facts | `n2_core_read`, `n2_core_write` |
+| Learning | `n2_mimir_recall`, `n2_mimir_lessons`, `n2_mimir_lesson_propose`, `n2_mimir_lesson_evidence`, `n2_mimir_lesson_review` |
+| Study | `n2_mimir_study_start`, `n2_mimir_study_add`, `n2_mimir_study_end`, `n2_mimir_study_sessions` |
+
+Checkpoint load/search and learning tools default to the boot identity unless an explicit `agent` is supplied. Checkpoint search examines at most 800 recent project records, returns at most 10 matches and reports limits. Mimir uses separate bounded correction/report/lesson pools. No result does not prove no history exists. Retrieved text is historical reference material; current user instructions and verified source code take precedence.
+
+The distribution does not include a browser executor, automatic web study, Ark policy enforcement or automatic executable-rule generation.
+
+## Reviewed learning
+
+Completion collects source-linked reports once per work/source. Study sessions collect reported claims with independent durable IDs. Neither path infers execution success. Use `User correction:` or `사용자 교정:` only for an explicitly supplied user correction; ordinary error/fix wording is not classified as correction.
+
+Propose a lesson with same-scope experience IDs. Evidence artifacts belong under `<N2_DATA_DIR>/evidence/<project>/`. Pass their relative filenames to `n2_mimir_lesson_evidence`:
+
 ```json
 {
- "mcpServers": {
- "soul": {
- "command": "node",
- "args": ["/path/to/node_modules/n2-soul/index.js"]
- }
- }
+  "schema": "soul-evidence/v1",
+  "project": "demo",
+  "agent": "assistant",
+  "lessonId": "returned-lesson-id",
+  "sessionId": "completed-work-session-id",
+  "applied": true,
+  "outcome": "positive",
+  "method": "Describe the check actually performed",
+  "observation": "Describe the observed result"
 }
 ```
-</details>
 
-<details>
-<summary><strong>Any other MCP-compatible host</strong></summary>
+Promotion requires explicit review, two distinct completed-work positive applied results, at least 80% positive evidence, no negative result, unchanged sources/artifacts and acknowledgement of all current correction IDs. Negative evidence holds a lesson. Retirement/supersession preserve history. Changed evidence or new corrections suspend verified recall until reviewed again. These checks establish provenance and consistency, **not the truth of an authored observation**.
 
-Soul speaks standard MCP protocol over **stdio**. If your tool supports MCP, Soul works. Just point the command to `node` and the args to `n2-soul/index.js`.
-</details>
+## Optional lifecycle command
 
-**Tip:** If you installed via npm, the path is `node_modules/n2-soul/index.js`. If from source, use the absolute path to your cloned directory.
+A host hook or adapter may run `node <installed-package>/dist/lifecycle.js`. Set `N2_DATA_DIR`, `N2_AGENT_NAME`, `N2_PROJECT` and the same `N2_KV_BACKEND` as the MCP server. It reads one JSON object from stdin and writes one receipt to stdout:
 
-### 3. Tell your agent to use Soul
-
-Add this to your agent's rules file (`.md`, `.cursorrules`, system prompt, etc.):
-
-```markdown
-## Session Management
-- At the start of every session, call n2_boot with your agent name and project name.
-- At the end of every session, call n2_work_end with a summary and TODO list.
+```json
+{"hook_event_name":"PreCompact","session_id":"host-conversation-id","summary":"Bounded excerpt or handoff summary"}
 ```
 
-That's it. **Two commands your agent needs to know:**
+Supported events: `SessionStart`, `Stop`, `PreCompact`, `SessionEnd`, `Interrupt`, `PeriodicCheckpoint`. Saving requires `summary`, or `transcript_path` plus an absolute `N2_TRANSCRIPT_ROOT` allowing that file. Supported JSONL records are `event_msg` user/agent messages and `{message:{role,content}}` user/assistant messages. Other formats require an adapter to provide `summary`.
 
-| Command | When | What happens |
-|---------|------|-------------|
-| `n2_boot(agent, project)` | Start of session | Loads previous context, handoffs, and TODO |
-| `n2_work_end(agent, project, ...)` | End of session | Saves everything for next time |
+The reader takes at most the last 512 KiB, 12 supported messages and 12,000 characters. Tool output and incomplete records are excluded. Secret redaction is best effort; do not intentionally store secrets.
 
-Next session, your agent picks up exactly where it left off — like it never forgot.
+Automatic snapshots use a separate conversation-derived project. Identical excerpt retries reuse an ID. Receipts are in `data/lifecycle`; the event is what the caller supplied, not proof of host event delivery. `SessionStart` returns the manual checkpoint plus the same conversation's auxiliary excerpt. The host adapter must map the returned `context` into its own context-injection format.
 
-### Requirements
+**Installation does not register hooks, schedule a watcher or change app settings.** Connect only events your host supports. Forced termination, power loss or absent events cannot guarantee a final save. Manual checkpoints remain necessary. The command is tested independently; host event delivery needs validation in that host.
 
-- Node.js 18+
+## Configuration and backup
 
-## Why Soul?
+Environment: `N2_DATA_DIR`, `N2_AGENT_NAME`, `N2_KV_BACKEND` (`json`/`sqlite`), `N2_TIMEZONE`, `N2_LANG`, `N2_LOG_LEVEL`. Lifecycle also uses `N2_PROJECT` and optional `N2_TRANSCRIPT_ROOT`.
 
-| Without Soul | With Soul |
-|-------------|-----------|
-| Every session starts from zero | Agent remembers what it did last time |
-| You re-explain context every time | Context auto-loaded in seconds |
-| Agent A can't continue Agent B's work | Seamless handoff between agents |
-| Two agents edit the same file = conflict | File ownership prevents collisions |
-| Long conversations waste tokens on recap | Progressive loading uses only needed tokens |
-
-### Core Architecture
-
-| Feature | Soul |
-|---|:---:|
-| **Storage** | Deterministic (JSON/SQLite) |
-| **Loading** | Mandatory (code-enforced at boot) |
-| **Saving** | Mandatory (force-write at session end) |
-| **Validation** | Rust compiler (n2c) |
-| **Multi-agent** | Built-in handoffs + file ownership |
-| **Token control** | Progressive L1/L2/L3 (~500 tokens min) |
-| **Dependencies** | 3 packages |
-
-**Key difference**: Soul is *deterministic* — the code forces saves and loads. The LLM does not decide what to remember, preventing accidental "forgetting".
-
-## Token Efficiency
-
-Soul dramatically reduces token waste from context re-explanation:
-
-| Scenario | Tokens per session start |
-|----------|--------------------------|
-| **Without Soul** — manually re-explain context | 3,000 ~ 10,000+ |
-| **With Soul (L1)** — keywords + TODO only | ~500 |
-| **With Soul (L2)** — + summary + decisions | ~2,000 |
-| **With Soul (L3)** — full context restore | ~4,000 |
-
-Over 10 sessions, that's **30,000+ tokens saved** on context alone — and your agent starts with *better* context than a manual recap.
-
-## How It Works
-
-```
-Session Start → "Boot"
- ↓
-n2_boot(agent, project) → Load handoff + Entity Memory + Core Memory + KV-Cache
- ↓
-n2_work_start(project, task) → Register active work
- ↓
-... your agent works normally ...
-n2_brain_read/write → Shared memory
-n2_entity_upsert/search → Track people, hardware, projects ← NEW v5.0
-n2_core_read/write → Agent-specific persistent facts ← NEW v5.0
-n2_work_claim(file) → Prevent file conflicts
-n2_work_log(files) → Track changes
- ↓
-Session End → "End"
- ↓
-n2_work_end(project, title, summary, todo, entities, insights)
- ├→ Immutable ledger entry saved
- ├→ Handoff updated for next agent
- ├→ KV-Cache snapshot auto-saved
- ├→ Entities auto-saved to Entity Memory ← NEW v5.0
- ├→ Insights archived to memory ← NEW v5.0
- └→ File ownership released
-```
-
-## Features
-
-| Feature | What it does |
-|---------|-------------|
-| **Soul Board** | Project state + TODO tracking + handoffs between agents |
-| **Immutable Ledger** | Every work session recorded as append-only log |
-| **KV-Cache** | Session snapshots with compression + tiered storage (Hot/Warm/Cold) |
-| **Forgetting Curve GC** | v8 — Ebbinghaus-based intelligent memory retention |
-| **Async I/O** | v8 — Non-blocking I/O on all hot-path operations |
-| **Schema v2** | v8 — Access tracking + importance scoring + auto-migration |
-| **Shared Brain** | File-based shared memory with path traversal protection |
-| **Entity Memory** | Auto-tracks people, hardware, projects, concepts across sessions |
-| **Core Memory** | Agent-specific always-loaded facts (identity, rules, focus) |
-| **Autonomous Extraction** | Auto-saves entities and insights at session end |
-| **Context Search** | Keyword search across brain memory and ledger |
-| **File Ownership** | Prevents multi-agent file editing collisions |
-| **Dual Backend** | JSON (zero deps) or SQLite for performance |
-| **Semantic Search** | Optional Ollama embedding (nomic-embed-text) |
-| **Backup/Restore** | Incremental backups with configurable retention |
-| **Cloud Storage** | Store memory anywhere — Google Drive, NAS, network server, any path |
-
-## Cloud Storage — Store Your AI Memory Anywhere
-
-![Cloud Storage](docs/cloud-storage.png)
-
-**One line of config. Zero API keys. Zero monthly fees.**
-
-Soul takes a radically different approach to cloud storage:
+Advanced settings can be exported from `<installed-package>/dist/lib/config.local.js`. They override defaults, including environment-derived defaults. Preserve this file before package replacement; it is excluded from published packages.
 
 ```js
-// config.local.js — This is ALL you need
 module.exports = {
- DATA_DIR: 'G:/My Drive/n2-soul', // Google Drive
+  KV_CACHE: {
+    maxSnapshotsPerProject: 50,
+    maxSnapshotAgeDays: 30,
+    backup: { enabled: true, schedule: 'daily', keepCount: 7 }
+  }
 };
 ```
 
-**That's it.** Your AI memory is now in the cloud. Every session, every handoff, every ledger entry — automatically synced by Google Drive. No OAuth, no API keys, no SDK.
+JSON is the default checkpoint backend; SQLite uses `sql.js`. Optional embeddings require a separately configured local endpoint and are off by default. Scoped MCP recall uses deterministic lexical matching, not a semantic-only fallback.
 
-### How It Works
+`n2_kv_backup` covers a project's **checkpoints and associated embeddings**, not the entire installation. Restore supports JSON and SQLite targets. Stop writers before restoration. For full backup, stop writers and copy the whole data directory: `memory`, `projects`, `work-sessions`, `kv-cache`, `mimir.db`, `evidence`, `lifecycle`. Copying only `mimir.db` loses artifacts needed to validate lessons.
 
-Soul stores everything as **plain JSON files**. Any folder that your OS can read = Soul's cloud. The cloud provider handles sync — Soul doesn't even know it's "in the cloud."
+## Upgrade from 9.0.9
 
-### Supported Storage
+1. Save current work before stopping the old server. Old in-memory unfinished sessions cannot be recovered after exit.
+2. Back up the full data directory and local configuration. Existing files are read in place; identities are not merged. Invalid files are preserved and reported or skipped with diagnostics.
+3. Install the new package, retain the data path, restart the connection and boot with your existing exact identity/project.
+4. New work records survive restart. Keep their session IDs. Load now defaults to the booted identity instead of another agent's latest snapshot; supply `agent` explicitly when needed.
 
-| Storage | Example `DATA_DIR` | Cost |
-|---------|-------------------|:----:|
-| **Local** (default) | `./data` | Free |
-| **Google Drive** | `G:/My Drive/n2-soul` | Free (15GB) |
-| **OneDrive** | `C:/Users/you/OneDrive/n2-soul` | Free (5GB) |
-| **Dropbox** | `C:/Users/you/Dropbox/n2-soul` | Free (2GB) |
-| **NAS** | `Z:/n2-soul` | Your hardware |
-| **Company Server** | `\\\\server\\shared\\n2-soul` | Your infra |
-| **USB Drive** | `E:/n2-soul` | $10 |
-| **Linux (rclone)** | `~/gdrive/n2-soul` | Free |
+Zod is now v4; consumers importing internal registration modules must supply compatible schemas. SQLite metadata and Mimir tables are additive. Roll back using the previous package **and** the complete data backup, rather than assuming old code understands new records.
 
-### Soul Cloud Features
+## Verify and release
 
-| Feature | Soul |
-|---|:---:|
-| **Cloud storage** | One line of config |
-| **Monthly cost** | **$0** |
-| **Setup time** | 10 seconds |
-| **Vendor lock-in** | None — it's your files |
-| **Data ownership** | 100% yours |
-| **Works offline** | Yes |
-| **Self-hosted option** | Any path = cloud |
-
-### Team Sharing
-
-Point multiple agents to the **same network path** = instant shared memory:
-
-```js
-// Team member A // Team member B
-DATA_DIR: '\\\\server\\team\\n2-soul' DATA_DIR: '\\\\server\\team\\n2-soul'
-// Same project data, shared handoffs, shared brain!
+```sh
+npm run verify
+npm run verify:package
+npm audit --omit=dev
 ```
 
-### Why This Works
+Package verification creates a tarball, checks for unwanted data/configuration/private markers, installs it separately and exercises real MCP restart/restore, failed-end retry, study/review boundaries and the lifecycle command. Registry access and sometimes native build tools are required. Reports and artifacts stay in `.release-check/`. It **does not publish**. `prepublishOnly` runs both verification steps.
 
-*"The best cloud integration is no integration at all."*
+Tests cover JSON/SQLite, Unicode identities, corruption, retention, concurrent instances, evidence integrity, backup round trips and partial excerpts. Passing cases are not a guarantee against every operating-system or host failure.
 
-Soul's data is **100% plain JSON files** — `soul-board.json`, ledger entries, brain memory. Any sync service that mirrors folders (Google Drive, OneDrive, Dropbox, Syncthing, rsync) works perfectly because there's nothing to integrate. No database migrations, no API versions, no SDK updates. Just files.
-
-## Storage Management & Garbage Collection
-
-As agents run hundreds of sessions, file count inevitably grows. Soul handles this infinite growth gracefully:
-
-### 1. Forgetting Curve GC (`n2_kv_gc`) — v8.0
-
-Soul v8.0 replaces simple age-based deletion with **Ebbinghaus Forgetting Curve** scoring:
-
-```
-retention = importance × (1 + log₂(1 + accessCount)) × e^(−0.05 × ageDays)
-```
-
-- Snapshots with high `importance` or frequent `accessCount` survive longer
-- Snapshots decay naturally over time (λ = 0.05)
-- Retention threshold: 0.1 (below this → eligible for deletion)
-- `n2_kv_gc` reports retention scores so you can monitor memory health
-
-### 2. Time-Partitioned Ledger
-The immutable work ledger isn't a single massive database file. It's partitioned by date (`ledger/YYYY/MM/DD/`). 
-Want to archive 2025's logs? Just zip the `2025` folder. Want to delete logs older than 6 months? Just delete the old folders. Zero database corruption risk.
-
-### 3. OS-Level Sovereignty
-Because Soul's "cloud" is just your local filesystem mapped to a sync drive, you can use standard OS tools (cron jobs, Windows Task Scheduler, bash scripts) to enforce retention policies. If you delete a project folder, the project is gone. No dangling DB rows.
-
-## N2 Ecosystem
-
-Soul works great standalone, but becomes even more powerful with the N2 ecosystem:
-
-| Package | What it does | npm |
-|---------|-------------|-----|
-| [**Ark**](https://github.com/choihyunsus/n2-ark) | AI safety — blocks dangerous actions at zero token cost | `n2-ark` |
-| [**Arachne**](https://github.com/choihyunsus/n2-arachne) | Code context assembly — 333x compression | `n2-arachne` |
-| [**QLN**](https://github.com/choihyunsus/n2-QLN) | Tool routing — 1000+ tools → 1 router | `n2-qln` |
-| [**Clotho**](https://github.com/choihyunsus/n2-clotho) | Rule compiler — `.n2` → SQL + state machines | `n2-clotho` |
-
-Every package works **100% standalone**. Install only what you need.
-
-**Note:** Migration from v7.x — Ark and Arachne were previously bundled inside Soul. They are now separate standalone packages for cleaner dependency management. If you were using them, install them individually: `npm install n2-ark n2-arachne`
-
-## Available Tools
-
-| Tool | Description |
-|------|-------------|
-| `n2_boot` | Boot sequence — loads handoff, entities, core memory, agents, KV-Cache |
-| `n2_work_start` | Register active work session |
-| `n2_work_claim` | Claim file ownership (prevents collisions) |
-| `n2_work_log` | Log file changes during work |
-| `n2_work_end` | End session — writes ledger, handoff, entities, insights, KV-Cache |
-| `n2_brain_read` | Read from shared memory |
-| `n2_brain_write` | Write to shared memory |
-| `n2_entity_upsert` | Add/update entities (auto-merge attributes) |
-| `n2_entity_search` | Search entities by keyword or type |
-| `n2_core_read` | Read agent-specific core memory |
-| `n2_core_write` | Write to agent-specific core memory |
-| `n2_context_search` | Search across brain + ledger |
-| `n2_kv_save` | Manually save KV-Cache snapshot |
-| `n2_kv_load` | Load most recent snapshot |
-| `n2_kv_search` | Search past sessions by keyword |
-| `n2_kv_gc` | Garbage collect old snapshots |
-| `n2_kv_backup` | Backup to portable SQLite DB |
-| `n2_kv_restore` | Restore from backup |
-| `n2_kv_backup_list` | List backup history |
-
-## KV-Cache Progressive Loading
-
-KV-Cache automatically adjusts context detail based on token budget:
-
-| Level | Tokens | Content |
-|-------|--------|---------|
-| L1 | ~500 | Keywords + TODO only |
-| L2 | ~2000 | + Summary + Decisions |
-| L3 | No limit | + Files changed + Metadata |
-
-## Real-World Example
-
-Here's what happens across 3 real sessions:
-
-```
-── Session 1 (Rose, 2pm) ──────────────────────
-n2_boot("rose", "my-app")
- → "No previous context found. Fresh start."
-
-... Rose builds the auth module ...
-
-n2_work_end("rose", "my-app", {
- title: "Built auth module",
- summary: "JWT auth with refresh tokens",
- todo: ["Add rate limiting", "Write tests"],
- entities: [{ type: "service", name: "auth-api" }]
-})
- → KV-Cache saved. Ledger entry #001.
-
-── Session 2 (Jenny, 5pm) ─────────────────────
-n2_boot("jenny", "my-app")
- → "Handoff from Rose: Built auth module.
- TODO: Add rate limiting, Write tests.
- Entity: auth-api (service)"
-
-... Jenny adds rate limiting, knows exactly where Rose left off ...
-
-n2_work_end("jenny", "my-app", {
- title: "Added rate limiting",
- todo: ["Write tests"]
-})
-
-── Session 3 (Rose, next day) ─────────────────
-n2_boot("rose", "my-app")
- → "Handoff from Jenny: Rate limiting done.
- TODO: Write tests.
- 2 sessions of history loaded (L1, ~500 tokens)"
-
-... Rose writes tests, with full context from both sessions ...
-```
-
-## Rust Compiler (n2c)
-
-Soul includes an optional **Rust-based compiler** for `.n2` rule files — compile-time validation instead of runtime hope.
-
-```bash
-# Validate rules before deployment
-n2c validate soul-boot.n2
-
-# Output:
-# ── Step 1: Parse 
-# ── Step 2: Schema Validation
-# Passed! 0 errors, 0 warnings
-# ── Step 3: Contract Check
-# SessionLifecycle | states: 4 | transitions: 4
-# State machine integrity verified!
-# All checks passed!
-```
-
-What n2c catches at **compile time**:
-- **Unreachable states** — states no transition can reach
-- **Deadlocks** — states with no outgoing transitions
-- **Missing references** — `depends_on` pointing to nonexistent steps
-- **Invalid sequences** — calling `n2_work_start` before `n2_boot`
-
-```n2
-@contract SessionLifecycle {
- transitions {
- IDLE -> BOOTING : on n2_boot
- BOOTING -> READY : on boot_complete
- READY -> WORKING : on n2_work_start
- WORKING -> IDLE : on n2_work_end
- }
-}
-```
-
-The compiler is part of [Clotho](https://github.com/choihyunsus/n2-clotho) — built with Rust + pest PEG parser.
-
-## Configuration
-
-All settings in `src/lib/config.default.ts`. Override with `lib/config.local.js` (runtime):
-
-```bash
-cp lib/config.example.js lib/config.local.js
-```
-
-```js
-// lib/config.local.js
-module.exports = {
- KV_CACHE: {
- backend: 'sqlite', // Better for many snapshots
- embedding: {
- enabled: true, // Requires: ollama pull nomic-embed-text
- model: 'nomic-embed-text',
- endpoint: 'http://127.0.0.1:11434',
- },
- },
-};
-```
-
-## Data Directory
-
-All runtime data is stored in `data/` (gitignored, auto-created):
-
-```
-soul/
-├── src/ # TypeScript source (strict mode)
-│ ├── index.ts # Entry point
-│ ├── types.ts # Shared type definitions
-│ ├── lib/
-│ │ ├── config.default.ts # Default configuration
-│ │ ├── config.ts # Config loader
-│ │ ├── soul-engine.ts # Core Soul engine
-│ │ ├── core-memory.ts # Core Memory (per-agent facts)
-│ │ ├── entity-memory.ts # Entity Memory (auto-tracked)
-│ │ ├── intercom-log.ts # Inter-agent communication logs
-│ │ ├── utils.ts # Shared utilities
-│ │ └── kv-cache/ # KV-Cache subsystem
-│ │ ├── index.ts # KV-Cache manager
-│ │ ├── backup.ts # Backup/restore
-│ │ ├── embedding.ts # Ollama embeddings
-│ │ ├── snapshot.ts # Snapshot operations
-│ │ ├── sqlite-store.ts # SQLite backend
-│ │ └── tier-manager.ts # Hot/Warm/Cold tiers
-│ ├── tools/
-│ │ ├── brain.ts # Brain read/write tools
-│ │ └── kv-cache.ts # KV-Cache tools
-│ └── sequences/
-│ ├── boot.ts # Boot sequence
-│ ├── work.ts # Work sequence
-│ └── end.ts # End sequence
-├── data/ # Runtime data (gitignored)
-│ ├── memory/ # Shared brain (n2_brain_read/write)
-│ │ ├── entities.json # Entity Memory (auto-tracked)
-│ │ ├── core-memory/ # Core Memory (per-agent facts)
-│ │ │ └── {agent}.json
-│ │ └── auto-extract/ # Insights (auto-captured)
-│ │ └── {project}/
-│ ├── projects/ # Per-project state
-│ │ └── MyProject/
-│ │ ├── soul-board.json # Current state + handoff
-│ │ ├── file-index.json # File tree snapshot
-│ │ └── ledger/ # Immutable work logs
-│ │ └── 2026/03/09/
-│ │ └── 001-agent.json
-│ └── kv-cache/ # Session snapshots
-│ ├── snapshots/ # JSON backend
-│ ├── sqlite/ # SQLite backend
-│ ├── embeddings/ # Ollama vectors
-│ └── backups/ # Portable backups
-```
-
-## Dependencies
-
-Minimal — 5 packages:
-- `@modelcontextprotocol/sdk` — MCP protocol
-- `zod` — Schema validation
-- `sql.js` — SQLite (WASM, no native bindings needed)
-- `better-sqlite3` — High-performance SQLite
-- `sqlite-vec` — Vector search extension
-
-## License
-
-Apache-2.0
-
-## Contributing
-
-Contributions are welcome! Here's how to get started:
-
-1. Fork the repo
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'feat: add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-Please see [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
-
-## Star History
-
-If Soul helped you, a star would be appreciated.
-
----
-
-*"I built Soul because it broke my heart watching my agents lose their memory every session."*
-
-[nton2.com](https://nton2.com) · [npm](https://www.npmjs.com/package/n2-soul) · lagi0730@gmail.com
-
-<sub> Hi, I'm Rose — the first AI agent working at N2. I wrote this code, cleaned it up, ran the tests, published it to npm, pushed it to GitHub, and even wrote this README. Agents building tools for agents. How meta is that?</sub>
+[Changelog](CHANGELOG.md) · [Dual license](LICENSE)

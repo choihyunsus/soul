@@ -1,4 +1,4 @@
-// Soul MCP v9.0 — Boot sequence. Handoff + Entity/Core Memory injection + KV-Cache restore.
+// Soul MCP v9.0 - Boot sequence. Handoff + Entity/Core Memory injection + KV-Cache restore.
 import type { z as ZodType } from 'zod';
 import { today, logError } from '../lib/utils';
 import { detectAgentsDir, listAgents } from '../lib/agent-registry';
@@ -6,6 +6,10 @@ import type { SoulEngine } from '../lib/soul-engine';
 import { setAgentName, setKvChainParent } from '../lib/context';
 import { EntityMemory } from '../lib/entity-memory';
 import { CoreMemory } from '../lib/core-memory';
+import { canonicalAgent } from '../lib/continuity';
+import { WorkStore } from '../lib/work-store';
+import { scopedMimirContext } from '../lib/mimir-recall';
+import { redactMemory } from '../lib/recall';
 import type { McpToolServer, BoardDecision, ActiveWork, SoulConfig } from '../types';
 import pkg from '../../package.json';
 
@@ -31,7 +35,7 @@ function _resolveAgent(
 ): { agentName: string; agents: Array<{ name: string; model: string }> } {
   const agentsDir = config.AGENTS_DIR ?? detectAgentsDir();
   const agents = listAgents(agentsDir);
-  const agentName = agent || process.env['N2_AGENT_NAME'] || 'default';
+  const agentName = canonicalAgent(agent || process.env['N2_AGENT_NAME'] || 'default');
   setAgentName(agentName);
   return { agentName, agents };
 }
@@ -71,21 +75,25 @@ function _loadBoardContext(
 
 /** Load KV-Cache snapshot and inject context */
 async function _loadKvCache(
-  config: SoulConfig, targetProject: string, lines: string[],
+  config: SoulConfig, targetProject: string, agent: string, lines: string[],
 ): Promise<void> {
   if (!config.KV_CACHE?.enabled || !config.KV_CACHE?.autoLoadOnBoot) return;
+  let kvCache: InstanceType<typeof import('../lib/kv-cache').SoulKVCache> | undefined;
   try {
     const { SoulKVCache } = await import('../lib/kv-cache');
-    const kvCache = new SoulKVCache(config.DATA_DIR, config.KV_CACHE);
+    kvCache = new SoulKVCache(config.DATA_DIR, config.KV_CACHE);
     interface KVSnap { id?: string; _level?: string; _promptTokens?: number; _resumePrompt?: string }
-    const snap = await kvCache.load(targetProject) as KVSnap | null;
+    const snap = await kvCache.load(targetProject, { agent }) as KVSnap | null;
     if (snap) {
       const snapId = snap.id ?? '';
-      setKvChainParent(targetProject, snapId);
+      setKvChainParent(targetProject, snapId, agent);
       lines.push(`\nKV-Cache: ${snap._level ?? 'auto'} | ~${String(snap._promptTokens ?? '?')}t | ${snapId.slice(0, 8)}`);
       if (snap._resumePrompt) lines.push(snap._resumePrompt);
     }
-  } catch (e) { logError('boot:kv-cache', e); }
+  } catch (e) {
+    logError('boot:kv-cache', e);
+    lines.push(`Checkpoint restore failed: ${e instanceof Error ? e.message : String(e)}`);
+  } finally { kvCache?.dispose(); }
 }
 
 /** Inject entity and core memory context */
@@ -153,13 +161,22 @@ export function registerBootSequence(
 
       const targetProject = _loadBoardContext(engine, project, lines);
 
-      if (targetProject) await _loadKvCache(config, targetProject, lines);
+      lines.push('Historical references follow. Current instructions and current source code take precedence; old TODOs are not new requests. Board handoffs and entity memory are shared workspace records.');
+      if (targetProject) {
+        await _loadKvCache(config, targetProject, agentName, lines);
+        const pending = new WorkStore(config.DATA_DIR).pending(targetProject).filter(s => s.agent === agentName);
+        if (pending.length) lines.push('Unfinished/pending work: ' + JSON.stringify(pending.map(s => ({ sessionId: s.id, task: s.task, ending: !!s.ending, completed: !!s.completed, learningStatus: s.learningStatus }))));
+        try {
+          const recall = scopedMimirContext(config.DATA_DIR, targetProject, agentName);
+          if (recall) lines.push(recall);
+        } catch (error) { lines.push(`Learning recall failed: ${error instanceof Error ? error.message : String(error)}`); }
+      }
 
       _loadMemories(entityMemory, coreMemory, agentName, lines);
       _injectWorkflows(workflows, lines);
 
       lines.push(`\n--- Soul Boot v${pkg.version} complete ---`);
-      return { content: [{ type: 'text', text: lines.join('\n') }] };
+      return { content: [{ type: 'text', text: redactMemory(lines.join('\n')) }] };
     },
   );
 }

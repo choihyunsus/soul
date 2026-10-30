@@ -1,4 +1,4 @@
-// Soul KV-Cache v9.0 — PerfMonitor. Self-tuning GC via query latency tracking.
+// Soul KV-Cache v9.0 - PerfMonitor. Self-tuning GC via query latency tracking.
 import { logError } from '../utils';
 
 /** GC parameter recommendation based on current performance */
@@ -32,8 +32,8 @@ const DEFAULTS = {
  * Tracks query latencies in a sliding window and recommends
  * GC parameters based on actual performance degradation.
  *
- * When queries slow down → GC becomes more aggressive.
- * When queries are fast → GC stays relaxed, keeping more history.
+ * When queries slow down -> GC becomes more aggressive.
+ * When queries are fast -> GC stays relaxed, keeping more history.
  */
 export class PerfMonitor {
   private readonly _window: number[];
@@ -94,9 +94,9 @@ export class PerfMonitor {
   /**
    * Recommend GC parameters based on current query performance.
    *
-   * - Fast queries (< slowThreshold) → relaxed GC (keep more history)
-   * - Slow queries (slowThreshold ~ criticalThreshold) → moderate GC
-   * - Critical queries (> criticalThreshold) → aggressive GC (3x reduction)
+   * - Fast queries (< slowThreshold) -> relaxed GC (keep more history)
+   * - Slow queries (slowThreshold ~ criticalThreshold) -> moderate GC
+   * - Critical queries (> criticalThreshold) -> aggressive GC (3x reduction)
    */
   recommendGC(
     currentMaxAge: number = DEFAULTS.baseMaxAgeDays,

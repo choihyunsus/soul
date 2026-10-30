@@ -1,5 +1,6 @@
-// Soul KV-Cache v9.0 — Orchestrator. Coordinates snapshot, compressor, and adapter.
+// Soul KV-Cache v9.0 - Orchestrator. Coordinates snapshot, compressor, and adapter.
 import path from 'path';
+import { memorySegment } from './atomic-json';
 import fs from 'fs';
 import { logError, logWarn, logInfo, writeFile } from '../utils';
 import { SnapshotEngine } from './snapshot';
@@ -15,8 +16,12 @@ import type { BackupResult, RestoreResult, ManifestEntry, BackupStatusResult } f
 import type { SessionData } from './schema';
 import type { KVCacheConfig } from '../../types';
 import type { StorageAdapter } from './storage-adapter';
+import { canonicalAgent } from '../continuity';
+import { recallTerms, redactMemory } from '../recall';
+import { recallQuery, matchRecall, recallExcerpt, markedCorrection } from '../recall-match';
 
 interface LoadOptions {
+  agent?: string;
   level?: string;
   budget?: number;
 }
@@ -45,7 +50,7 @@ interface KVCacheInternalConfig {
   };
 }
 
-// BackupResult type imported from ./backup — no local duplicate needed
+// BackupResult type imported from ./backup - no local duplicate needed
 
 const DEFAULT_COMPRESSION_TARGET = 1000;
 const AUTO_BACKUP_DELAY_MS = 5 * 60 * 1000;
@@ -65,7 +70,7 @@ function createStorageEngine(
 
   if (backend === 'sqlite') {
     try {
-      // NOTE: require() kept — synchronous function cannot use dynamic import()
+      // NOTE: require() kept - synchronous function cannot use dynamic import()
       const { SqliteStore, initSqlJs } = require('./sqlite-store') as typeof import('./sqlite-store');
       const sqliteDir = config.sqliteDir || path.join(dataDir, 'kv-cache', 'sqlite');
       const sqliteEngine = new SqliteStore(sqliteDir);
@@ -74,7 +79,7 @@ function createStorageEngine(
         sqliteEngine.init(),
       ).catch((e: unknown) => {
         const msg = e instanceof Error ? e.message : String(e);
-        console.error(`[kv-cache] SQLite init failed: ${msg}`);
+        throw new Error(`[kv-cache] SQLite init failed: ${msg}`);
       });
     } catch (e) {
       logError('kv-cache:sqlite', `SQLite unavailable (${e instanceof Error ? e.message : String(e)}), falling back to JSON`);
@@ -93,6 +98,8 @@ function createStorageEngine(
 }
 
 interface McpSaveInput {
+  importance?: number;
+  id?: string;
   agent?: string;
   project?: string;
   summary?: string;
@@ -109,6 +116,7 @@ interface McpSaveInput {
 export class SoulKVCache {
   readonly snapshot: StorageAdapter;
   private readonly dataDir: string;
+  private readonly storageConfig: Partial<KVCacheConfig>;
   private readonly config: KVCacheInternalConfig;
   private readonly embedding: EmbeddingEngine | null;
   private _embeddingReady: boolean;
@@ -124,6 +132,7 @@ export class SoulKVCache {
     this.snapshot = engine;
     this._readyPromise = readyPromise;
     this.dataDir = dataDir;
+    this.storageConfig = config;
     this.config = {
       backend: config.backend || 'json',
       compressionTarget: config.compressionTarget || DEFAULT_COMPRESSION_TARGET,
@@ -162,6 +171,7 @@ export class SoulKVCache {
     const backupConfig = config.backup;
     if (backupConfig?.enabled) {
       this._backup = new BackupManager(dataDir, {
+        snapshotDir: config.snapshotDir ?? undefined, sqliteDir: config.sqliteDir ?? undefined, backend: config.backend,
         dir: backupConfig.dir ?? undefined,
         keepCount: backupConfig.keepCount,
         incremental: backupConfig.incremental,
@@ -188,20 +198,24 @@ export class SoulKVCache {
     }
   }
 
+  async ready(): Promise<void> { await this._readyPromise; }
+
   /** Cleanup timers and resources — call before discarding instance */
   dispose(): void {
     this.stopAutoBackup();
+    this.snapshot.dispose?.();
   }
 
   /** Save a session snapshot with automatic compression */
   async save(agent: string, project: string, sessionData: McpSaveInput): Promise<string> {
+    canonicalAgent(agent); memorySegment(project);
     await this._readyPromise;  // M4: wait for SQLite init before any operation
-    const normalized = fromMcpSession({ agent, project, ...sessionData });
+    const normalized = fromMcpSession({ ...sessionData, agent, project });
 
     if (normalized.context.summary) {
       const result = compress(normalized.context.summary, this.config.compressionTarget);
       normalized.keys = [...new Set([...normalized.keys, ...result.keys])];
-      normalized.context.summary = result.compressed || normalized.context.summary;
+      // Keep the original durable text; compression is for presentation only.
     }
 
     const id = await this.snapshot.save(normalized);
@@ -225,13 +239,14 @@ export class SoulKVCache {
   async load(project: string, options: LoadOptions = {}): Promise<LoadedSnapshot | null> {
     await this._readyPromise;
     const start = performance.now();
-    const snap = await this.snapshot.loadLatest(project);
+    const snap = options.agent === undefined ? await this.snapshot.loadLatest(project)
+      : (await this.snapshot.list(project, Number.MAX_SAFE_INTEGER)).find(s => s.agentName === canonicalAgent(options.agent ?? '') && s.projectName === project) ?? null;
     this._perf.record(performance.now() - start);
     if (!snap) return null;
 
     // Forgetting Curve: track access
     if (snap.id) {
-      this.snapshot.touch(snap.projectName || project, snap.id).catch((e: unknown) => logError('kv-cache:touch', e));
+      await this.snapshot.touch(snap.projectName || project, snap.id).catch((e: unknown) => logError('kv-cache:touch', e));
     }
 
     const level = options.level || 'auto';
@@ -265,6 +280,31 @@ export class SoulKVCache {
     }
     this._perf.record(performance.now() - start);
     return results;
+  }
+
+  /** Scoped search with source receipts; never changes access counts or lessons. */
+  async searchScoped(query: string, project: string, agent: string, limit = 5): Promise<{
+    results: Array<{ id: string; agent: string; savedAt: string; excerpt: string; score: number }>; limited: boolean; scanned: number;
+  }> {
+    memorySegment(project); agent = memorySegment(canonicalAgent(agent));
+    if (!Number.isInteger(limit) || limit < 1 || limit > 10) throw Error('Search limit must be an integer from 1 to 10');
+    await this._readyPromise;
+    const terms = recallQuery(recallTerms(query.slice(0, 12000)));
+    if (!terms.groups.length) return { results: [], limited: false, scanned: 0 };
+    const snapshots = await this.snapshot.list(project, 801);
+    const candidates = snapshots.slice(0, 800).flatMap(snap => {
+      if (snap.projectName !== project || canonicalAgent(snap.agentName) !== agent) return [];
+      const savedAt = snap.endedAt || snap.startedAt, stamp = Date.parse(savedAt);
+      if (!Number.isFinite(stamp) || stamp > Date.now() + 300000) return [];
+      const text = redactMemory([snap.context.summary.slice(0, 16000), ...snap.context.decisions.slice(0, 30)].join('\n'));
+      const match = matchRecall(text, terms);
+      if (!match.eligible) return [];
+      return [{ id: snap.id, agent: snap.agentName, savedAt: new Date(stamp).toISOString(), score: match.score,
+        correction: markedCorrection(text), excerpt: recallExcerpt(text, terms, 280) }];
+    });
+    candidates.sort((a, b) => Number(b.correction) - Number(a.correction) ||
+      (a.correction && b.correction ? b.savedAt.localeCompare(a.savedAt) : b.score - a.score) || b.savedAt.localeCompare(a.savedAt) || a.id.localeCompare(b.id));
+    return { results: candidates.slice(0, limit), limited: snapshots.length > 800, scanned: Math.min(800, snapshots.length) };
   }
 
   private async _semanticSearch(query: string, project: string, limit: number): Promise<SessionData[]> {
@@ -342,13 +382,13 @@ export class SoulKVCache {
   }
 
   private _storeEmbedding(project: string, snapshotId: string, vector: number[]): void {
-    const dir = path.join(this.dataDir, 'kv-cache', 'embeddings', project);
+    const dir = path.join(this.dataDir, 'kv-cache', 'embeddings', memorySegment(project));
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     writeFile(path.join(dir, `${snapshotId}.json`), JSON.stringify(vector));
   }
 
   private _loadEmbedding(project: string, snapshotId: string): number[] | null {
-    const filePath = path.join(this.dataDir, 'kv-cache', 'embeddings', project, `${snapshotId}.json`);
+    const filePath = path.join(this.dataDir, 'kv-cache', 'embeddings', memorySegment(project), `${memorySegment(snapshotId)}.json`);
     if (!fs.existsSync(filePath)) return null;
     try {
       return JSON.parse(fs.readFileSync(filePath, 'utf-8')) as number[];
@@ -360,7 +400,7 @@ export class SoulKVCache {
 
   /** Backup project data */
   async backup(project: string, options: { full?: boolean } = {}): Promise<BackupResult> {
-    if (!this._backup) this._backup = new BackupManager(this.dataDir, {});
+    if (!this._backup) this._backup = new BackupManager(this.dataDir, { snapshotDir: this.storageConfig.snapshotDir ?? undefined, sqliteDir: this.storageConfig.sqliteDir ?? undefined, backend: this.storageConfig.backend, dir: this.storageConfig.backup?.dir ?? undefined });
     return this._backup.backup(project, options);
   }
 
@@ -368,30 +408,32 @@ export class SoulKVCache {
   async restore(
     project: string, backupId?: string | null, options: { target?: 'sqlite' | 'json' } = {},
   ): Promise<RestoreResult> {
-    if (!this._backup) this._backup = new BackupManager(this.dataDir, {});
+    if (!this._backup) this._backup = new BackupManager(this.dataDir, { snapshotDir: this.storageConfig.snapshotDir ?? undefined, sqliteDir: this.storageConfig.sqliteDir ?? undefined, backend: this.storageConfig.backend, dir: this.storageConfig.backup?.dir ?? undefined });
     return this._backup.restore(project, backupId, options);
   }
 
   /** List backup history for a project */
   listBackups(project: string): (ManifestEntry & { sizeFormatted: string })[] {
-    if (!this._backup) this._backup = new BackupManager(this.dataDir, {});
+    if (!this._backup) this._backup = new BackupManager(this.dataDir, { snapshotDir: this.storageConfig.snapshotDir ?? undefined, sqliteDir: this.storageConfig.sqliteDir ?? undefined, backend: this.storageConfig.backend, dir: this.storageConfig.backup?.dir ?? undefined });
     return this._backup.list(project);
   }
 
   /** Backup status for a project */
   backupStatus(project: string): BackupStatusResult {
-    if (!this._backup) this._backup = new BackupManager(this.dataDir, {});
+    if (!this._backup) this._backup = new BackupManager(this.dataDir, { snapshotDir: this.storageConfig.snapshotDir ?? undefined, sqliteDir: this.storageConfig.sqliteDir ?? undefined, backend: this.storageConfig.backend, dir: this.storageConfig.backup?.dir ?? undefined });
     return this._backup.status(project);
   }
 
   private async _runAutoBackup(): Promise<void> {
     if (!this._backup) return;
-    const snapBaseDir = path.join(this.dataDir, 'kv-cache', 'snapshots');
+    const sqlite = this.config.backend === 'sqlite';
+    const snapBaseDir = sqlite ? this.storageConfig.sqliteDir || path.join(this.dataDir, 'kv-cache', 'sqlite')
+      : this.storageConfig.snapshotDir || path.join(this.dataDir, 'kv-cache', 'snapshots');
     try {
       if (!fs.existsSync(snapBaseDir)) return;
       const projects = fs.readdirSync(snapBaseDir, { withFileTypes: true })
-        .filter(d => d.isDirectory() && !d.name.startsWith('_'))
-        .map(d => d.name);
+        .filter(d => sqlite ? d.isFile() && d.name.endsWith('.sqlite') : d.isDirectory())
+        .map(d => sqlite ? d.name.slice(0, -7) : d.name);
 
       for (const project of projects) {
         try {

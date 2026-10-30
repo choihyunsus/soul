@@ -1,4 +1,4 @@
-// Soul v9.0 — Entity Memory: structured entity tracking for people, places, concepts, etc.
+// Soul v9.0 - Entity Memory: structured entity tracking for people, places, concepts, etc.
 import fs from 'fs';
 import path from 'path';
 import { readJson, writeJson, nowISO } from './utils';
@@ -36,7 +36,7 @@ interface BatchResult {
 }
 
 /**
- * EntityMemory — Structured entity tracking and auto-injection.
+ * EntityMemory - Structured entity tracking and auto-injection.
  * Data path: data/memory/entities.json
  * Entity types: person, hardware, project, concept, place, service
  */
