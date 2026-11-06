@@ -2,6 +2,14 @@
 
 All notable changes to Soul are documented here.
 
+## [9.2.1] — 2026-11-07
+
+### SQLite durability
+- Require `better-sqlite3` 12.8 or newer and verify the actual SQLite runtime is at least 3.51.3 before opening Mimir storage. This carries the upstream WAL-reset data-loss fix. The locked driver uses SQLite 3.53.2.
+- Route report collection through the same checked database opener. Add minimum-version regression tests.
+- Refresh dependency fixes, including the development-only minimatch override. Run lint, type checking, 90 tests and isolated packaged MCP save/restart/restore verification.
+- Publish a versioned GitHub tarball and document its installation. Replace installed dependencies and restart the server to activate the new engine. Back up the data directory before upgrading.
+
 ## [9.2.0] — 2026-10-30
 
 ### Continuity and retention

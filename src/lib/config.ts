@@ -11,7 +11,7 @@ try {
   // NOTE: require() intentionally kept - config.local.js is a runtime-optional CJS file
   // that may or may not exist. Static import cannot handle optional modules gracefully.
   const rawConf: unknown = require('./config.local.js');
-  local = (typeof rawConf === 'object' && rawConf !== null ? rawConf : {}) as DeepPartial<SoulConfig>;
+  local = (typeof rawConf === 'object' && rawConf !== null ? rawConf : {});
 } catch (e: unknown) {
   if (e instanceof Error && 'code' in e && (e as NodeJS.ErrnoException).code !== 'MODULE_NOT_FOUND') throw e;
 }

@@ -168,9 +168,13 @@ export class SoulKVCache {
       slowThresholdMs: config.perfSlowMs ?? 100,
       criticalThresholdMs: config.perfCriticalMs ?? 500,
     });
+    this.configureBackup(config);
+  }
+
+  private configureBackup(config: Partial<KVCacheConfig>): void {
     const backupConfig = config.backup;
     if (backupConfig?.enabled) {
-      this._backup = new BackupManager(dataDir, {
+      this._backup = new BackupManager(this.dataDir, {
         snapshotDir: config.snapshotDir ?? undefined, sqliteDir: config.sqliteDir ?? undefined, backend: config.backend,
         dir: backupConfig.dir ?? undefined,
         keepCount: backupConfig.keepCount,
@@ -327,7 +331,7 @@ export class SoulKVCache {
       return ranked.map(r => {
         const match = candidates.find(c => c.id === r.id);
         if (!match) return null;
-        return { ...match.snap, _score: r.score } as SessionData & { _score: number };
+        return { ...match.snap, _score: r.score };
       }).filter(Boolean) as (SessionData & { _score: number })[];
     } catch (e) {
       logError('kv-cache:semantic-search', e);

@@ -224,7 +224,7 @@ export class SqliteStore implements StorageAdapter {
           const escaped = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
           return sum + (text.match(new RegExp(escaped, 'g')) || []).length;
         }, 0);
-        return { ...session, _score } as ScoredSession;
+        return { ...session, _score };
       })
       .sort((a, b) => b._score - a._score);
   }

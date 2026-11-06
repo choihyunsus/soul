@@ -1,6 +1,6 @@
 {
     "name": "n2-soul",
-    "version": "9.2.0",
+    "version": "9.2.1",
     "description": "AI agent memory & session orchestrator for MCP — persistent KV-Cache, Soul Board, immutable Ledger",
     "main": "dist/index.js",
     "types": "dist/index.d.ts",
@@ -56,7 +56,7 @@
     },
     "dependencies": {
         "@modelcontextprotocol/sdk": "^1.32.2",
-        "better-sqlite3": "^11.10.0",
+        "better-sqlite3": "^12.8.0",
         "sql.js": "~1.11.0",
         "sqlite-vec": "^0.1.7",
         "zod": "^4.6.7"
@@ -68,5 +68,8 @@
         "eslint": "^10.1.0",
         "typescript": "^5.9.3",
         "typescript-eslint": "^8.57.2"
+    },
+    "overrides": {
+        "minimatch": "^11.0.1"
     }
 }

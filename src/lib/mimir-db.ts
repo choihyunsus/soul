@@ -5,6 +5,7 @@ import path from 'path';
 import Database from 'better-sqlite3';
 import { canonicalAgent } from './continuity';
 import { memorySegment } from './kv-cache/atomic-json';
+import { assertSqliteRuntime } from './sqlite-version';
 
 export function learningIdentity(project: string, agent: string): string {
   memorySegment(project);
@@ -17,6 +18,7 @@ export function openMimir(dataDir: string, write = false): Database.Database {
   if (write) fs.mkdirSync(dataDir, { recursive: true });
   const db = new Database(file, { readonly: !write, fileMustExist: !write, timeout: 1500 });
   try {
+    assertSqliteRuntime(db);
     db.pragma('foreign_keys=ON');
     if (write && !exists) db.exec(SCHEMA_SQL);
     return db;

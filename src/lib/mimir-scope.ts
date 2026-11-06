@@ -1,21 +1,10 @@
 // Scoped access to the existing Mimir schema. Reading never votes, learns, or creates rules.
-import { SCHEMA_SQL } from './mimir-schema';
-import fs from 'fs';
-import path from 'path';
+import { openMimir } from './mimir-db';
 import { createHash, randomUUID } from 'crypto';
 import { canonicalAgent } from './continuity';
 import { memorySegment } from './kv-cache/atomic-json';
 import { redactMemory } from './recall';
 export { scopedMimirContext, scopedMimirRecall } from './mimir-recall';
-
-type Row = Record<string, unknown>;
-interface Statement {
-  all(...params: unknown[]): Row[];
-  get(...params: unknown[]): Row | undefined;
-  run(...params: unknown[]): { changes: number };
-}
-interface Connection { prepare(sql: string): Statement; exec(sql: string): void; close(): void }
-const Database = require('better-sqlite3') as new (file: string, options?: { readonly?: boolean; fileMustExist?: boolean; timeout?: number }) => Connection;
 
 export interface WorkReport {
   sessionId: string; summary?: string; decisions?: string[];
@@ -56,13 +45,8 @@ export function recordWorkReports(dataDir: string, project: string, agent: strin
   agent = identity(project, agent);
   const entries = reports(input);
   if (!entries.length) return { inserted: 0, duplicates: 0 };
-  fs.mkdirSync(dataDir, { recursive: true });
-  const file = path.join(dataDir, 'mimir.db');
-  const exists = fs.existsSync(file);
-  const db = new Database(file, { timeout: 1500 });
+  const db = openMimir(dataDir, true);
   try {
-    if (!exists) db.exec(SCHEMA_SQL);
-    db.exec('PRAGMA foreign_keys=ON');
     // Additive receipts; historical experiences and insights are never rewritten.
     db.exec(`CREATE TABLE IF NOT EXISTS soul_mimir_ingest (
       source_ref TEXT PRIMARY KEY, payload_hash TEXT NOT NULL,
@@ -73,7 +57,7 @@ export function recordWorkReports(dataDir: string, project: string, agent: strin
       for (const entry of entries) {
         const source = `soul-${input.sourceKind || 'work'}://` + [project, agent, input.sessionId, entry.source].map(encodeURIComponent).join('/');
         const digest = createHash('sha256').update(JSON.stringify(entry)).digest('hex');
-        const prior = db.prepare('SELECT payload_hash FROM soul_mimir_ingest WHERE source_ref=?').get(source);
+        const prior = db.prepare('SELECT payload_hash FROM soul_mimir_ingest WHERE source_ref=?').get(source) as { payload_hash: string } | undefined;
         if (prior) {
           if (prior.payload_hash !== digest) throw Error('Mimir report retry differs from its saved source; original preserved');
           duplicates++; continue;

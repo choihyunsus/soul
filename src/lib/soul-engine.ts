@@ -5,9 +5,8 @@ import { readStrict } from './durable';
 import path from 'path';
 import { readJson, writeJson, nowISO, logError } from './utils';
 import type {
-  SoulBoard, BoardState, Handoff, LedgerEntry, FileChange,
+  SoulBoard, LedgerEntry, FileChange,
   ClaimResult, ProjectInfo, FileIndex, FileEntry, DirectoryEntry,
-  FileOwnership, ActiveWork,
 } from '../types';
 
 interface BoardCacheEntry {
@@ -83,11 +82,11 @@ export class SoulEngine {
       project: projectName,
       updatedAt: nowISO(),
       updatedBy: null,
-      state: { summary: '', version: '', health: 'unknown' } as BoardState,
+      state: { summary: '', version: '', health: 'unknown' },
       activeWork: {},
       fileOwnership: {},
       decisions: [],
-      handoff: { from: null, summary: '', todo: [], blockers: [] } as Handoff,
+      handoff: { from: null, summary: '', todo: [], blockers: [] },
       lastLedger: null,
     };
   }
@@ -102,7 +101,7 @@ export class SoulEngine {
     if (existing && existing.owner && existing.owner !== agent) {
       return { ok: false, owner: existing.owner, intent: existing.intent };
     }
-    board.fileOwnership[filePath] = { owner: agent, since: nowISO(), intent } as FileOwnership;
+    board.fileOwnership[filePath] = { owner: agent, since: nowISO(), intent };
     board.updatedBy = agent;
     this.writeBoard(projectName, board);
     return { ok: true };
@@ -127,7 +126,7 @@ export class SoulEngine {
     const board = this.readBoard(projectName);
     board.activeWork[agent] = {
       task, since: nowISO(), files: files || [],
-    } as ActiveWork;
+    };
     board.updatedBy = agent;
     this.writeBoard(projectName, board);
   }
@@ -287,7 +286,7 @@ export class SoulEngine {
             result[key] = {
               desc: '',
               children: walk(fullPath, depth + 1),
-            } as DirectoryEntry;
+            };
           } else {
             const stat = fs.statSync(fullPath);
             result[entry.name] = {

@@ -1,6 +1,6 @@
 [한국어](README.ko.md)
 
-# Soul 9.2
+# Soul 9.2.1
 
 Persistent memory and resumable work for MCP agents. Soul stores checkpoints, work records, shared handoffs and source-linked learning reports locally. It restores saved material when an agent calls its tools; it does not preserve a model's full context or guarantee those calls.
 
@@ -8,6 +8,7 @@ This distribution contains no preset persona, private memories, local configurat
 
 ## What's new
 
+- Version 9.2.1 requires SQLite 3.51.3 or newer and checks the actual engine before opening Mimir storage. This includes the WAL-reset data-loss fix. Existing installations must replace dependencies and restart the MCP server. [SQLite fix](https://www.sqlite.org/releaselog/3_51_3.html)
 - Durable work sessions with unique `sessionId`s. Resume after restart and retry interrupted completion without duplicating its checkpoint or ledger.
 - Atomic file publication, write exclusion for work/core/SQLite mutations, corruption checks and Windows path validation.
 - Original checkpoint text retained on disk; compression applies to restored context only.
@@ -22,10 +23,10 @@ This distribution contains no preset persona, private memories, local configurat
 Use Node.js 22 or 24 LTS and an MCP client supporting local stdio servers. The runtime requires Node.js 20.19 or newer. Mimir uses `better-sqlite3`; platforms without a matching prebuilt binary need a native build toolchain.
 
 ```sh
-npm install n2-soul
+npm install https://github.com/choihyunsus/soul/releases/download/v9.2.1/n2-soul-9.2.1.tgz
 ```
 
-For an unpublished candidate, install the locally built `n2-soul-9.2.0.tgz` instead. An npm install retrieves the version currently published there.
+The command installs the verified GitHub release. `npm install n2-soul` follows the npm registry, whose latest version can differ. Check `npm view n2-soul version` before using that route. Back up your complete data directory before an upgrade.
 
 Register the **absolute installed entry path** in your client's MCP configuration. Adapt the surrounding format to that client:
 
