@@ -1,162 +1,64 @@
+# N2 Soul
+
+**AI와 진행한 일과 다음 할 일을 저장해, 다음 대화에서 이어갈 수 있게 도와줍니다.**
+
+[![release: 9.2.1](https://img.shields.io/badge/release-9.2.1-2563eb)](https://github.com/choihyunsus/soul/releases/tag/v9.2.1) [![runtime: Node.js 22+](https://img.shields.io/badge/runtime-Node.js%2022%2B-334155)](https://github.com/choihyunsus/soul/blob/main/docs/reference.ko.md) [![license: terms](https://img.shields.io/badge/license-terms-64748b)](https://github.com/choihyunsus/soul/blob/main/LICENSE)
+
 [English](README.md)
 
-# Soul 9.2.1
+![진행 내용 저장 → 대화 다시 시작 → 다음 할 일 복원](https://github.com/choihyunsus/soul/raw/refs/heads/main/docs/images/overview.ko.svg)
 
-MCP 에이전트가 다음 대화에서도 작업을 이어가도록 체크포인트, 작업 장부, 공유 인계와 출처가 있는 학습 보고를 로컬에 저장합니다. 에이전트가 도구를 호출하면 저장 내용을 복원합니다. 모델의 전체 컨텍스트나 도구 호출 자체를 보장하는 프로그램은 아닙니다.
+## 이런 때 사용하세요
 
-배포판에는 특정 인물의 페르소나, 개인 기억, 사용자 설정, 설치된 앱 훅이 없습니다. 사용할 이름과 프로젝트를 직접 정하세요.
+긴 작업을 며칠에 걸쳐 이어가거나, 대화가 바뀔 때마다 배경을 다시 설명해야 할 때 사용하세요.
 
-## 주요 개선
+사용하는 AI 앱에 MCP 연결 기능이 필요합니다. MCP는 AI 앱이 외부 도구를 호출하는 연결 방식입니다. 저장·복원 도구를 실제로 호출하도록 앱이나 에이전트에 설정해야 합니다.
 
-- 9.2.1은 SQLite 3.51.3 이상을 요구하고 Mimir 저장소를 열기 전에 실제 엔진 버전을 검사합니다. WAL-reset 데이터 유실 수정이 포함됩니다. 기존 설치는 의존성을 갱신하고 MCP 서버를 재시작하세요. [SQLite 수정 내역](https://www.sqlite.org/releaselog/3_51_3.html)
-- 작업마다 고유한 `sessionId`를 디스크에 저장합니다. 재시작 후 이어가고 종료 저장 실패도 같은 입력으로 중복 없이 재시도합니다.
-- 파일을 완성한 뒤 교체하고 작업·핵심 기억·SQLite 쓰기를 잠금으로 보호합니다. 손상 파일과 위험한 경로를 검사합니다.
-- 체크포인트 원문을 보존합니다. 압축은 복원 시 보여주는 내용에만 적용합니다.
-- 에이전트별 읽기·검색, 한영 용어 대응, 출처 ID와 명시된 사용자 교정 우선 검색을 제공합니다.
-- 프로젝트 안의 **에이전트별 최신 체크포인트**와 `importance >= 0.8` 기록은 자동 정리에서 보호합니다. 보호 기록 때문에 개수 제한을 넘을 수 있습니다. 종료 시 장부를 자동 삭제하지 않습니다.
-- 자료 수집·보고·근거 검토를 구분하며 보고를 성공이나 사실로 자동 승격하지 않습니다.
-- 시작·종료·압축 이벤트에 연결할 선택형 공용 명령을 제공합니다. 자동 발췌는 수동 체크포인트와 별도 보관합니다.
-- 의존성 보안 수정과 실제 배포 파일의 별도 설치 검증을 추가했습니다.
+## 처음 실행하기
 
-## 설치
-
-Node.js 22 또는 24 LTS와 로컬 stdio를 지원하는 MCP 클라이언트를 사용하세요. 런타임 최소 버전은 Node.js 20.19입니다. Mimir의 `better-sqlite3`는 플랫폼에 맞는 사전 빌드 파일이 없으면 네이티브 빌드 도구가 필요합니다.
+터미널에서 `node --version`을 실행해 Node.js 22 이상인지 확인하세요. 아래 명령은 새 연습 폴더를 만들고 GitHub 배포 파일을 설치합니다. 예제 파일과 DB도 이 폴더에 두면 경로를 따라가기 쉽습니다.
 
 ```sh
+mkdir soul-demo
+cd soul-demo
+npm init -y
 npm install https://github.com/choihyunsus/soul/releases/download/v9.2.1/n2-soul-9.2.1.tgz
 ```
 
-위 명령은 검증한 GitHub 릴리스를 설치합니다. `npm install n2-soul`은 npm 저장소의 최신 버전을 가져오므로 `npm view n2-soul version`으로 버전을 먼저 확인하세요. 업그레이드 전 전체 데이터 폴더를 백업하세요.
+설치 중 SQLite 빌드 오류가 나오면 운영체제에 맞는 C/C++ 빌드 도구가 필요할 수 있습니다. 자세한 환경 조건은 [설치 참고](https://github.com/choihyunsus/soul/blob/main/docs/reference.ko.md)에 있습니다.
 
-경로를 자신의 설치·저장 위치로 바꾸고 앱의 MCP 설정 형식에 맞춰 등록하세요.
+사용하는 AI 앱의 MCP 설정에 아래 연결을 추가하세요. `C:/tools/soul`은 방금 만든 설치 폴더의 **절대 경로**로 바꿉니다. `N2_DATA_DIR`은 기억을 저장할 별도 폴더입니다. macOS·Linux에서는 `/home/me/tools/soul` 같은 자신의 경로를 사용하세요.
 
 ```json
 {
   "mcpServers": {
     "soul": {
       "command": "node",
-      "args": ["C:/tools/soul/node_modules/n2-soul/dist/index.js"],
+      "args": [
+        "C:/tools/soul/node_modules/n2-soul/dist/index.js"
+      ],
       "env": {
-        "N2_DATA_DIR": "C:/agent-memory/soul",
-        "N2_AGENT_NAME": "assistant",
-        "N2_KV_BACKEND": "json"
+        "N2_DATA_DIR": "C:/agent-memory/soul"
       }
     }
   }
 }
 ```
 
-Linux/macOS도 `/home/me/agent-memory/soul` 같은 절대 경로를 사용합니다. 재설치 때 기억이 사라지지 않도록 데이터는 `node_modules` 밖에 두세요. `N2_DATA_DIR` 미지정 시 기존 기본값인 `<설치된 패키지>/data`를 사용합니다.
+앱에서 연결을 켠 다음 AI에게 다음처럼 요청하세요.
 
-소스 저장소에서는 `npm ci`, `npm run verify`, `npm start` 순서로 실행합니다.
+> Soul의 n2_kv_save 도구로 agent는 assistant, project는 demo, summary는 “다음에 설치 안내를 검토하기”로 저장해 줘. 저장에 성공하면 같은 agent와 project로 n2_kv_load를 호출해 다시 읽어 줘.
 
-## 이어서 작업하는 순서
+저장 ID가 나오고 읽어 온 내용에 같은 할 일이 있으면 성공입니다. 실제 도구 실행 결과를 확인하세요. 다음 대화에서도 같은 이름과 프로젝트를 사용합니다.
 
-모델명 대신 계속 사용할 이름을 정하세요. 대소문자와 한글을 포함해 정확하게 구분하고 별칭을 자동 병합하지 않습니다.
+## Soul과 함께 쓰기
 
-1. `n2_boot({agent:"assistant", project:"demo"})`를 호출하고 체크포인트·인계·미완료 작업을 읽습니다.
-2. `n2_work_start`에 이름·프로젝트·작업을 전달하고 반환된 `sessionId`를 보관합니다.
-3. `n2_work_log`에 그 ID를 전달합니다. 중요한 결정 이후와 응답·컨텍스트 인계 전에 `n2_kv_save`로 요약을 저장하세요. 자동 삭제하면 안 되는 기록은 `importance: 0.8` 이상으로 지정합니다.
-4. `n2_work_end`에 같은 이름·프로젝트·ID와 제목·요약·다음 할 일을 전달합니다. 작업 장부를 마무리하며 중간 체크포인트를 대신하지 않습니다.
-5. 재시작 후 `n2_work_sessions`로 남은 작업을 확인합니다. 종료 저장 실패는 **같은 sessionId와 원래 입력 전체**로 재시도합니다. 다른 입력은 거절합니다. 완료 요청은 중복 저장하지 않으며 부가 학습 보고 저장 실패도 조회·재시도할 수 있습니다.
+Soul은 작업 요약과 인계를 보관합니다. Mimir는 경험을 찾아 쓰는 기능, 구미호는 역할별 작업 실행, Loom은 대화와 도구 실행을 담당합니다. 필요한 기능부터 연결할 수 있어요.
 
-같은 에이전트도 여러 작업을 가질 수 있습니다. ID 생략은 미완료 작업을 하나로 특정할 때만 허용합니다. 파일 소유권은 에이전트 단위이며 마지막 활성 작업을 마치면 해제합니다.
+## 다음 단계와 상세 안내
 
-부팅 체크포인트는 해당 이름의 범위에서 복원합니다. 프로젝트 보드·일반 brain 파일·개체 기억·기존 `n2_context_search`는 **작업공간 공유 기록**입니다. 이름별 구분은 인증이나 접근 통제가 아닙니다. 무관하거나 신뢰하지 않는 사용자끼리는 데이터 폴더를 분리하세요.
+[전체 사용 안내](https://github.com/choihyunsus/soul/blob/main/docs/reference.ko.md)에서 실제 앱 연결, API, 지원 범위, 복구 절차와 검증 범위를 확인할 수 있습니다. [배포 파일](https://github.com/choihyunsus/soul/releases/tag/v9.2.1)에는 설치할 버전과 변경 설명이 있습니다.
 
-## 도구
+처음 나오는 용어는 이렇게 읽으면 됩니다. **MCP**는 AI 앱의 도구 연결 방식, **DB**는 저장 파일, **호스트**는 이 모듈을 연결해 실행하는 앱입니다.
 
-| 용도 | 도구 |
-| --- | --- |
-| 부팅·작업 | `n2_boot`, `n2_work_start`, `n2_work_sessions`, `n2_work_claim`, `n2_work_log`, `n2_work_end` |
-| 체크포인트 | `n2_kv_save`, `n2_kv_load`, `n2_kv_search`, `n2_kv_gc` |
-| 백업 | `n2_kv_backup`, `n2_kv_restore`, `n2_kv_backup_list` |
-| 공유 기억 | `n2_brain_read`, `n2_brain_write`, `n2_entity_upsert`, `n2_entity_search`, `n2_context_search` |
-| 핵심 기억 | `n2_core_read`, `n2_core_write` |
-| 학습·검토 | `n2_mimir_recall`, `n2_mimir_lessons`, `n2_mimir_lesson_propose`, `n2_mimir_lesson_evidence`, `n2_mimir_lesson_review` |
-| 자료 수집 | `n2_mimir_study_start`, `n2_mimir_study_add`, `n2_mimir_study_end`, `n2_mimir_study_sessions` |
-
-체크포인트 읽기·검색과 학습 도구의 `agent` 생략 시 부팅한 이름을 사용합니다. 체크포인트 검색은 최근 프로젝트 기록 최대 800개에서 최대 10개 결과를 반환하며 한도를 표시합니다. Mimir는 교정·보고·교훈에 별도 한도를 적용합니다. 검색 결과가 없다고 기록이 없다고 단정하면 안 됩니다. 과거 자료보다 현재 사용자 지시와 확인한 소스를 우선하세요.
-
-브라우저 실행기·자동 웹 자료 수집·Ark 정책 집행·실행 규칙 자동 생성은 이 배포판에 포함하지 않습니다.
-
-## 근거를 검토하는 학습
-
-작업 종료는 작업·출처별 보고를 한 번씩 수집합니다. 공부 세션은 별도 ID로 자료를 보관합니다. 둘 다 성공을 임의로 판단하지 않습니다. 실제 사용자 교정만 `User correction:` 또는 `사용자 교정:`으로 기록하세요. 오류·수정 단어만으로 교정으로 분류하지 않습니다.
-
-같은 프로젝트·에이전트의 경험 ID로 교훈 후보를 제안합니다. 적용 근거는 `<N2_DATA_DIR>/evidence/<프로젝트>/`에 저장하고 `n2_mimir_lesson_evidence`에 상대 파일명을 전달합니다.
-
-```json
-{
-  "schema": "soul-evidence/v1",
-  "project": "demo",
-  "agent": "assistant",
-  "lessonId": "반환된-교훈-ID",
-  "sessionId": "완료된-작업-ID",
-  "applied": true,
-  "outcome": "positive",
-  "method": "실제로 수행한 검증 방법",
-  "observation": "관찰한 결과"
-}
-```
-
-승격에는 명시적 검토, 서로 다른 완료 작업 2건 이상의 긍정적 적용 결과, 긍정 비율 80% 이상, 부정 결과 없음, 출처·근거 불변, 현재 사용자 교정 ID 전체 확인이 필요합니다. 부정 결과는 보류하고 폐기·대체 이력도 보존합니다. 새 교정이나 변경된 근거가 있으면 재검토 전까지 검증된 교훈으로 복원하지 않습니다. 이는 출처와 일관성 검사이며 **작성된 관찰의 진실 자체를 증명하지는 않습니다.**
-
-## 선택형 종료·압축 저장 명령
-
-호스트 훅이나 어댑터에서 `node <설치된 패키지>/dist/lifecycle.js`를 실행합니다. `N2_DATA_DIR`, `N2_AGENT_NAME`, `N2_PROJECT`, MCP 서버와 같은 `N2_KV_BACKEND`를 지정합니다. 표준입력으로 JSON 하나를 받고 표준출력에 결과 JSON을 반환합니다.
-
-```json
-{"hook_event_name":"PreCompact","session_id":"호스트-대화-ID","summary":"저장할 대화 일부 또는 인계 요약"}
-```
-
-이벤트는 `SessionStart`, `Stop`, `PreCompact`, `SessionEnd`, `Interrupt`, `PeriodicCheckpoint`를 지원합니다. 저장에는 `summary`, 또는 `transcript_path`와 허용 폴더의 절대 경로 `N2_TRANSCRIPT_ROOT`가 필요합니다. 지원 JSONL은 `event_msg` 사용자·에이전트 메시지와 `{message:{role,content}}` 사용자·어시스턴트 메시지입니다. 다른 형식은 어댑터에서 `summary`로 변환하세요.
-
-파일 끝 최대 512 KiB에서 지원 메시지 12개·문자 12,000개까지만 읽습니다. 도구 출력과 쓰다가 끊긴 기록은 제외합니다. 비밀값 필터는 완전하지 않으므로 비밀키를 의도적으로 저장하지 마세요.
-
-자동 기록은 대화 ID로 계산한 별도 프로젝트에 저장하고 같은 내용의 재시도는 같은 ID를 사용합니다. `data/lifecycle`의 이벤트명은 호출자가 전달한 값이며 실제 호스트 실행 증명은 아닙니다. 시작 시 수동 체크포인트와 같은 대화의 보조 발췌를 반환합니다. 어댑터에서 결과의 `context`를 호스트 컨텍스트 주입 형식에 연결해야 합니다.
-
-**설치만으로 훅 등록·주기 저장기 실행·앱 설정 변경을 하지 않습니다.** 호스트가 지원하는 이벤트에 연결하세요. 강제 종료·전원 차단·누락 이벤트에서는 마지막 저장을 보장하지 못합니다. 의미 있는 수동 체크포인트도 계속 필요합니다. 공용 명령은 시험하지만 앱별 이벤트 전달은 해당 앱에서 확인해야 합니다.
-
-## 설정과 백업
-
-환경변수는 `N2_DATA_DIR`, `N2_AGENT_NAME`, `N2_KV_BACKEND`(`json`/`sqlite`), `N2_TIMEZONE`, `N2_LANG`, `N2_LOG_LEVEL`입니다. 보조 저장은 `N2_PROJECT`와 선택적으로 `N2_TRANSCRIPT_ROOT`도 사용합니다.
-
-고급 설정은 `<설치된 패키지>/dist/lib/config.local.js`에서 내보냅니다. 환경변수로 계산한 기본값보다 우선합니다. 패키지 교체 전에 별도 보관하세요. 배포 파일에서는 제외합니다.
-
-```js
-module.exports = {
-  KV_CACHE: {
-    maxSnapshotsPerProject: 50,
-    maxSnapshotAgeDays: 30,
-    backup: { enabled: true, schedule: 'daily', keepCount: 7 }
-  }
-};
-```
-
-체크포인트 기본 저장소는 JSON이며 SQLite 선택 시 `sql.js`를 사용합니다. 선택형 임베딩은 별도 로컬 엔드포인트가 필요하며 기본값은 꺼짐입니다. 범위를 지정한 MCP 검색은 어휘·별칭 기반이며 의미 유사도만으로 결과를 대신하지 않습니다.
-
-`n2_kv_backup`은 프로젝트의 **체크포인트와 관련 임베딩** 백업이며 Soul 전체 백업이 아닙니다. JSON/SQLite 복원이 가능하고 복원 전 쓰기를 멈춰야 합니다. 전체 백업은 기록 프로세스를 멈춘 뒤 `memory`, `projects`, `work-sessions`, `kv-cache`, `mimir.db`, `evidence`, `lifecycle`을 포함한 데이터 폴더 전체를 복사합니다. DB만 복사하면 교훈 검증에 필요한 근거 파일이 빠집니다.
-
-## 9.0.9에서 업그레이드
-
-1. 현재 작업을 저장하고 이전 서버를 종료합니다. 이전 버전의 메모리에만 있던 미완료 작업은 종료 후 복원할 수 없습니다.
-2. 데이터 폴더 전체와 로컬 설정을 백업합니다. 기존 파일은 그대로 읽고 이름을 병합하지 않습니다. 손상 파일은 보존하고 오류를 표시하거나 진단 메시지와 함께 건너뜁니다.
-3. 새 패키지를 설치하고 기존 데이터 위치를 유지한 뒤 재연결·부팅합니다.
-4. 새 작업은 디스크에 저장됩니다. 반환된 ID를 유지하세요. 읽기 기본 범위는 부팅한 에이전트이며 다른 이름은 `agent`를 명시합니다.
-
-Zod는 v4로 올라갔으므로 내부 등록 모듈을 가져다 쓰는 코드는 호환 스키마가 필요합니다. SQLite 메타데이터와 Mimir 표는 추가 방식으로 확장합니다. 되돌릴 때는 이전 패키지와 전체 데이터 백업을 함께 복원하세요.
-
-## 배포 전 검증
-
-```sh
-npm run verify
-npm run verify:package
-npm audit --omit=dev
-```
-
-실제 배포 압축 파일에서 개인 흔적·설정·데이터 포함 여부를 검사하고 별도 폴더에 설치합니다. MCP 재시작·복원, 실패한 종료 재시도, 학습 검토 제한과 보조 저장 명령을 시험합니다. npm 연결과 환경에 따라 네이티브 빌드 도구가 필요합니다. 결과와 패키지는 `.release-check/`에 남으며 **게시하지 않습니다.** 게시 전에도 두 검증 절차를 실행합니다.
-
-JSON/SQLite·한글 이름·손상 데이터·보존 정책·여러 인스턴스·근거 무결성·백업 복원·제한된 발췌를 시험합니다. 통과는 해당 사례의 검증 결과이며 모든 운영체제·호스트 장애를 보장하지는 않습니다.
-
-[변경 이력](CHANGELOG.md) · [듀얼 라이선스](LICENSE)
+사용·재배포 조건은 [라이선스](https://github.com/choihyunsus/soul/blob/main/LICENSE)를 확인하세요. 의존 모듈에는 별도 조건이 적용될 수 있으며, 상업 이용 조건은 상세 안내에 함께 설명되어 있습니다.
