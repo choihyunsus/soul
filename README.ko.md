@@ -6,7 +6,20 @@
 
 [English](README.md)
 
+<p align="center">
+  <img src="https://github.com/choihyunsus/soul/raw/refs/heads/main/docs/images/comic.png" alt="어제 작업을 저장하고 → 새 대화에서 메모를 읽어 → 다음 할 일을 확인하고 → 작업을 이어갑니다." width="640">
+</p>
+
+어제 작업을 저장하고 → 새 대화에서 메모를 읽어 → 다음 할 일을 확인하고 → 작업을 이어갑니다.
+
+기능을 이야기로 표현한 만화입니다. 실제 앱 화면은 아닙니다.
+
+<details>
+<summary>동작 흐름 펼쳐 보기</summary>
+
 ![진행 내용 저장 → 대화 다시 시작 → 다음 할 일 복원](https://github.com/choihyunsus/soul/raw/refs/heads/main/docs/images/overview.ko.svg)
+
+</details>
 
 ## 이런 때 사용하세요
 

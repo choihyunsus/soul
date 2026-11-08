@@ -6,7 +6,20 @@
 
 [한국어](README.ko.md)
 
+<p align="center">
+  <img src="https://github.com/choihyunsus/soul/raw/refs/heads/main/docs/images/comic.png" alt="Save what you worked on with an AI and what comes next, so a later conversation can pick it up." width="640">
+</p>
+
+Save what you worked on with an AI and what comes next, so a later conversation can pick it up.
+
+A story illustrating the feature, rather than a screenshot of the app.
+
+<details>
+<summary>View the workflow</summary>
+
 ![Save progress → Start a new chat → Restore next steps](https://github.com/choihyunsus/soul/raw/refs/heads/main/docs/images/overview.svg)
+
+</details>
 
 ## When to use it
 
